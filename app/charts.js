@@ -79,6 +79,31 @@ export function SellerRankChart({ rows, title }) {
   );
 }
 
+/** 월별 예상매출 vs 실제매출 비교 */
+export function ForecastActualChart({ data }) {
+  if (!data || !data.months) return null;
+  const rows = data.months.map((m, i) => ({
+    month: m,
+    '예상': data.forecast[i] || 0,
+    '실제': data.actual[i] || null,
+  }));
+  return (
+    <div style={{ width: '100%', height: 300 }}>
+      <ResponsiveContainer>
+        <BarChart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="month" fontSize={11} />
+          <YAxis tickFormatter={formatTick} fontSize={11} />
+          <Tooltip formatter={formatTooltip} contentStyle={{ fontSize: 13, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+          <Legend wrapperStyle={{ fontSize: 13 }} />
+          <Bar dataKey="예상" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="실제" fill="#2563eb" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 /** 2026 월별 실제 매출 line chart (전년 동기 대비) */
 export function TrendChart({ yearly }) {
   if (!yearly) return null;

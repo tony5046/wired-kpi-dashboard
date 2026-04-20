@@ -1,7 +1,7 @@
 'use client';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
-import { YearlyChart, SellerRankChart, TrendChart } from './charts';
+import { YearlyChart, SellerRankChart, TrendChart, ForecastActualChart } from './charts';
 import { FilterBar } from './filter-bar';
 import { TrendSection } from './trend-cards';
 
@@ -88,7 +88,7 @@ function PeriodSummaryCard({ period, range }) {
       borderRadius: 12, color: '#fff',
     }}>
       <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 4 }}>
-        {range.label} 매출 ({range.startDate} ~ {range.endDate})
+        {range.label} 실제 매출 (발송일 기준, {range.startDate} ~ {range.endDate})
       </div>
       <div style={{ fontSize: 30, fontWeight: 700, marginBottom: 12 }}>{won(total.sales)}</div>
       <div style={{ display: 'flex', gap: 20, fontSize: 13, flexWrap: 'wrap' }}>
@@ -353,6 +353,13 @@ export default function Home() {
                 </Section>
               )}
             </section>
+          )}
+
+          {/* 예상 vs 실제 매출 (시트 기반) */}
+          {data.forecastVsActual && (
+            <Section title="월별 예상 vs 실제 매출 (구글시트 기준)" emoji="🎯">
+              <ForecastActualChart data={data.forecastVsActual} />
+            </Section>
           )}
 
           {/* 2025 vs 2026 추이 */}
