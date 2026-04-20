@@ -1,7 +1,8 @@
 'use client';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { YearlyChart, SellerRankChart, TrendChart } from './charts';
+import { FilterBar } from './filter-bar';
 
 function won(n) {
   if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '-';
@@ -12,12 +13,40 @@ function count(n) {
   return Number(n).toLocaleString('ko-KR') + '건';
 }
 
+const cardStyle = {
+  padding: 20,
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  borderRadius: 12,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+};
+const th = {
+  padding: '10px 8px', borderBottom: '2px solid #e5e7eb',
+  textAlign: 'right', fontSize: 12, color: '#6b7280', fontWeight: 500,
+};
+const td = {
+  padding: '10px 8px', borderBottom: '1px solid #f3f4f6', textAlign: 'right',
+};
+
+function Section({ title, emoji, children, right }) {
+  return (
+    <section style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 16, margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {emoji} {title}
+        </h2>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function KpiCard({ title, target, achieved, rate, dateProgress, expectedRate, color }) {
   const rateNum = Number(rate) || 0;
   const dpNum = Number(dateProgress) || 0;
   const expected = Number(expectedRate) || 0;
   const onPace = rateNum >= dpNum;
-
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>{title}</div>
@@ -47,9 +76,9 @@ function KpiCard({ title, target, achieved, rate, dateProgress, expectedRate, co
   );
 }
 
-function MonthSummaryCard({ current, period }) {
-  if (!current) return null;
-  const { total } = current;
+function PeriodSummaryCard({ period, range }) {
+  if (!period) return null;
+  const { total } = period;
   const marginRate = total.sales > 0 ? (total.margin / total.sales) * 100 : 0;
   return (
     <div style={{
@@ -58,10 +87,10 @@ function MonthSummaryCard({ current, period }) {
       borderRadius: 12, color: '#fff',
     }}>
       <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 4 }}>
-        이번달 매출 ({period.startDate} ~ {period.endDate})
+        {range.label} 매출 ({range.startDate} ~ {range.endDate})
       </div>
       <div style={{ fontSize: 30, fontWeight: 700, marginBottom: 12 }}>{won(total.sales)}</div>
-      <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
+      <div style={{ display: 'flex', gap: 20, fontSize: 13, flexWrap: 'wrap' }}>
         <div>
           <div style={{ opacity: 0.7 }}>공헌이익</div>
           <div style={{ fontWeight: 600, fontSize: 15 }}>{won(total.margin)}</div>
@@ -82,7 +111,16 @@ function MonthSummaryCard({ current, period }) {
 }
 
 function RankingTable({ title, rows, emoji, limit = 10 }) {
-  if (!rows || rows.length === 0) return null;
+  if (!rows || rows.length === 0) {
+    return (
+      <div style={cardStyle}>
+        <h3 style={{ fontSize: 15, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {emoji} {title}
+        </h3>
+        <p style={{ fontSize: 13, color: '#9ca3af' }}>해당 기간 데이터 없음</p>
+      </div>
+    );
+  }
   return (
     <div style={cardStyle}>
       <h3 style={{ fontSize: 15, margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -156,43 +194,32 @@ function YearlyTable({ yearly }) {
   );
 }
 
-function Section({ title, emoji, children }) {
-  return (
-    <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={{ fontSize: 16, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        {emoji} {title}
-      </h2>
-      {children}
-    </section>
-  );
+function buildQuery(filters) {
+  const usp = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && v !== null) usp.set(k, String(v));
+  });
+  return usp.toString();
 }
 
-const cardStyle = {
-  padding: 20,
-  background: '#fff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 12,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-};
-const th = {
-  padding: '10px 8px', borderBottom: '2px solid #e5e7eb',
-  textAlign: 'right', fontSize: 12, color: '#6b7280', fontWeight: 500,
-};
-const td = {
-  padding: '10px 8px', borderBottom: '1px solid #f3f4f6', textAlign: 'right',
-};
+function parseQuery() {
+  if (typeof window === 'undefined') return {};
+  const usp = new URLSearchParams(window.location.search);
+  return Object.fromEntries(usp.entries());
+}
 
 export default function Home() {
   const { data: session, status } = useSession();
+  const [filters, setFilters] = useState(() => parseQuery());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!session) return;
+  const fetchData = useCallback((currentFilters) => {
     setLoading(true);
     setError(null);
-    fetch('/api/data')
+    const q = buildQuery(currentFilters);
+    fetch('/api/data' + (q ? '?' + q : ''))
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.message || d.error);
@@ -200,7 +227,18 @@ export default function Home() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [session]);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchData(filters);
+    // URL 동기화
+    if (typeof window !== 'undefined') {
+      const q = buildQuery(filters);
+      const newUrl = window.location.pathname + (q ? '?' + q : '');
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [session, filters, fetchData]);
 
   if (status === 'loading') return <main style={{ padding: 40 }}>로딩 중...</main>;
 
@@ -209,8 +247,7 @@ export default function Home() {
       <main style={{ padding: 40, maxWidth: 480, margin: '80px auto', textAlign: 'center' }}>
         <h1 style={{ fontSize: 28, marginBottom: 12 }}>와이어드 KPI 대시보드</h1>
         <p style={{ color: '#666', marginBottom: 32, lineHeight: 1.5 }}>
-          와이어드 직원 전용 매출 현황판입니다.
-          <br />Google 계정으로 로그인해주세요.
+          와이어드 직원 전용 매출 현황판입니다.<br />Google 계정으로 로그인해주세요.
         </p>
         <button
           onClick={() => signIn('google')}
@@ -229,7 +266,7 @@ export default function Home() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, margin: 0 }}>🏠 와이어드 KPI 대시보드</h1>
           {data?.generatedAt && (
@@ -250,9 +287,11 @@ export default function Home() {
         </div>
       </header>
 
+      <FilterBar filters={filters} onChange={setFilters} />
+
       {loading && (
         <div style={{ textAlign: 'center', padding: 60, color: '#9ca3af' }}>
-          데이터 불러오는 중... (이번달 주문 집계 10초 정도)
+          데이터 불러오는 중... (주문 집계까지 수 초 걸릴 수 있어요)
         </div>
       )}
 
@@ -266,15 +305,15 @@ export default function Home() {
         </div>
       )}
 
-      {data && (
+      {data && !loading && (
         <>
-          {/* 상단 3 카드 */}
+          {/* 상단 3 카드: 선택 기간 매출 + KPI 2개 */}
           <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
-            {data.currentMonth ? (
-              <MonthSummaryCard current={data.currentMonth} period={data.period} />
+            {data.period ? (
+              <PeriodSummaryCard period={data.period} range={data.range} />
             ) : (
               <div style={{ ...cardStyle, fontSize: 13, color: '#ef4444' }}>
-                이번달 매출 로딩 실패: {data.ordersError || '알 수 없음'}
+                매출 로딩 실패: {data.ordersError || '알 수 없음'}
               </div>
             )}
             {data.kpi?.gongdonGuMae && (
@@ -301,15 +340,15 @@ export default function Home() {
             )}
           </section>
 
-          {/* 차트: 연도별 비교 + 이번달 셀러 TOP */}
+          {/* 차트: 연도별 비교 + 선택 기간 셀러 TOP */}
           {data.yearly && (
             <section style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16, marginBottom: 16 }}>
               <Section title="연도별 월별 매출 비교" emoji="📊">
                 <YearlyChart yearly={data.yearly} />
               </Section>
-              {data.currentMonth && (
-                <Section title="이번달 셀러 TOP 10" emoji="🏪">
-                  <SellerRankChart rows={data.currentMonth.bySeller} />
+              {data.period && (
+                <Section title={`${data.range.label} 셀러 TOP 10`} emoji="🏪">
+                  <SellerRankChart rows={data.period.bySeller} />
                 </Section>
               )}
             </section>
@@ -322,13 +361,13 @@ export default function Home() {
             </Section>
           )}
 
-          {/* 랭킹 4종 */}
-          {data.currentMonth && (
+          {/* 랭킹 4종 — 선택 기간 기준 */}
+          {data.period && (
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-              <RankingTable title="셀러담당자별 매출" rows={data.currentMonth.bySellerManager} emoji="👤" />
-              <RankingTable title="브랜드 TOP 10" rows={data.currentMonth.byBrand} emoji="🏷️" />
-              <RankingTable title="셀러 TOP 10" rows={data.currentMonth.bySeller} emoji="🏪" />
-              <RankingTable title="마켓 TOP 10" rows={data.currentMonth.byMarket} emoji="🛒" />
+              <RankingTable title="셀러담당자별 매출" rows={data.period.bySellerManager} emoji="👤" />
+              <RankingTable title="브랜드 TOP 10" rows={data.period.byBrand} emoji="🏷️" />
+              <RankingTable title="셀러 TOP 10" rows={data.period.bySeller} emoji="🏪" />
+              <RankingTable title="마켓 TOP 10" rows={data.period.byMarket} emoji="🛒" />
             </section>
           )}
 
@@ -342,7 +381,7 @@ export default function Home() {
           </Section>
 
           <p style={{ color: '#9ca3af', fontSize: 13, margin: '24px 0', textAlign: 'center' }}>
-            🚧 다음: 주/월/년 필터, 셀러별 부진·상승세 감지, 매일 새벽 3시 자동 캐시
+            🚧 다음: 셀러별 부진·상승세 감지, 매일 새벽 3시 자동 캐시
           </p>
         </>
       )}
