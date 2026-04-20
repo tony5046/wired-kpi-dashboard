@@ -3,6 +3,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
 import { YearlyChart, SellerRankChart, TrendChart } from './charts';
 import { FilterBar } from './filter-bar';
+import { TrendSection } from './trend-cards';
 
 function won(n) {
   if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '-';
@@ -369,6 +370,16 @@ export default function Home() {
               <RankingTable title="셀러 TOP 10" rows={data.period.bySeller} emoji="🏪" />
               <RankingTable title="마켓 TOP 10" rows={data.period.byMarket} emoji="🛒" />
             </section>
+          )}
+
+          {/* 셀러 부진/상승세 (월간 필터일 때만) */}
+          {data.trends && (
+            <>
+              <h2 style={{ fontSize: 16, margin: '8px 4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                🎯 셀러 동향 (직전 3개월 평균 대비)
+              </h2>
+              <TrendSection trends={data.trends} />
+            </>
           )}
 
           {/* 연도별 비교 테이블 */}
