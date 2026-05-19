@@ -1,6 +1,7 @@
 'use client';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { YearlyChart, SellerRankChart, TrendChart, ForecastActualChart } from './charts';
 import { FilterBar } from './filter-bar';
 import { TrendSection } from './trend-cards';
@@ -277,6 +278,12 @@ export default function Home() {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link href="/query" style={{
+            padding: '6px 14px', fontSize: 13, fontWeight: 500,
+            background: '#eef2ff', color: '#4338ca',
+            border: '1px solid #c7d2fe', borderRadius: 6,
+            textDecoration: 'none',
+          }}>🔎 매출 조회기</Link>
           <span style={{ color: '#666', fontSize: 14 }}>
             {session.user.name} ({session.user.email})
           </span>
