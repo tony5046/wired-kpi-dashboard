@@ -24,7 +24,7 @@ export async function GET(request) {
   revalidateTag('sheets');
   revalidateTag('orders');
 
-  // 2. 기본 뷰 prewarm (이번 달)
+  // 2. 가벼운 기본 뷰 prewarm만 (60초 한도 안에 들어가도록)
   const result = { revalidated: true, at: new Date().toISOString() };
   try {
     await getDashboardData({});
@@ -33,7 +33,7 @@ export async function GET(request) {
     result.prewarmError = e.message;
   }
 
-  // 추가 prewarm: 지난 달, 올해 전체
+  // 지난 달 prewarm (별도 try)
   const now = new Date();
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   try {
@@ -42,10 +42,11 @@ export async function GET(request) {
       year: String(lastMonth.getFullYear()),
       month: String(lastMonth.getMonth() + 1),
     });
-  } catch {}
-  try {
-    await getDashboardData({ period: 'year', year: String(now.getFullYear()) });
-  } catch {}
+    result.prewarmed += ', last-month';
+  } catch (e) {
+    // 무시 — 첫 접속 때 캐시됨
+  }
 
+  // 연간 prewarm은 너무 무거워서 스킵 (사용자가 연간 클릭 시 첫 호출 때만 느림)
   return NextResponse.json(result);
 }
