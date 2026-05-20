@@ -4,13 +4,18 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 
 // ───── 유틸 ─────
-// 매출/마진/예상매출 등 금액은 백만원 단위 표기
+// 매출/마진/예상매출 등 금액은 백만원 단위 표기 (반올림)
 function won(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
   const num = Number(n);
   if (num === 0) return '0백만원';
-  const m = num / 1_000_000;
-  return m.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '백만원';
+  const m = Math.round(num / 1_000_000);
+  return m.toLocaleString('ko-KR') + '백만원';
+}
+// 원 단위까지 보고싶을 때 (리스트 안 등)
+function wonFull(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return '-';
+  return Number(n).toLocaleString('ko-KR') + '원';
 }
 function count(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
@@ -41,7 +46,7 @@ function LoadingRow({ size = 16, text = '데이터 가져오는 중...' }) {
   );
 }
 
-// ───── 기본 요약 카드 ─────
+// ───── 기본 요약 카드 (모든 기간 동일 포맷) ─────
 function PeriodSummaryCard({ title, data, loading, error, range, color = '#2563eb' }) {
   return (
     <div style={summaryCard}>
@@ -56,40 +61,13 @@ function PeriodSummaryCard({ title, data, loading, error, range, color = '#2563e
         <div style={{ fontSize: 12, color: '#ef4444' }}>로드 실패: {error}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Row label="총 매출 (포함)" value={won(data?.totalSales)} hint="출고 대기 포함" color={color} bold />
-          <Row label="총 매출 (미포함)" value={won(data?.actualSales)} hint="출고 완료만" />
-          <Row label="누적 예상매출" value={won(data?.estimatedSales)} hint="마켓 등록값" />
-          <Row label="공구 마켓 (총)" value={count(data?.marketsAll)} />
-          <Row label="공구 마켓 (진행)" value={count(data?.marketsActive)} hint="취소 제외" />
+          <Row label="예상 매출" value={won(data?.estimatedSales)} color={color} bold />
+          <Row label="예상매출 + 실제매출" value={won(data?.mixedSales)} />
+          <Row
+            label="공구마켓 (총/진행)"
+            value={`${count(data?.marketsAll)} / ${count(data?.marketsActive)}`}
+          />
         </div>
-      )}
-    </div>
-  );
-}
-
-function SimpleSummaryCard({ title, data, loading, error, range }) {
-  return (
-    <div style={summaryCard}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>
-        {range ? `${range.startDate} ~ ${range.endDate}` : ' '}
-      </div>
-
-      {loading ? (
-        <LoadingRow text="로딩 중..." />
-      ) : error ? (
-        <div style={{ fontSize: 12, color: '#ef4444' }}>오류</div>
-      ) : (
-        <>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb', marginBottom: 6 }}>
-            {won(data?.totalSales)}
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
-            마진 {won(data?.totalMargin)}<br />
-            예상매출 {won(data?.estimatedSales)}<br />
-            마켓 {count(data?.marketsAll)} (진행 {count(data?.marketsActive)})
-          </div>
-        </>
       )}
     </div>
   );
@@ -248,10 +226,12 @@ function ManagerList({ rows, loading, range }) {
 
 // ───── 메인 페이지 ─────
 const PERIODS = [
-  { key: 'thisWeek', title: '📅 이번주', isFull: false },
-  { key: 'thisMonth', title: '📅 이번달', isFull: true }, // 셀러/브랜드 리스트도 가져옴
-  { key: 'lastMonth', title: '📅 지난달', isFull: false },
   { key: 'thisYear', title: '📅 올해 누적', isFull: false },
+  { key: 'thisMonth', title: '📅 이번달', isFull: true }, // 셀러/브랜드 리스트도 가져옴
+  { key: 'nextMonth', title: '📅 다음달', isFull: false },
+  { key: 'thisWeek', title: '📅 이번주', isFull: false },
+  { key: 'nextWeek', title: '📅 다음주', isFull: false },
+  { key: 'lastMonth', title: '📅 저번달', isFull: false },
   { key: 'sameMonthLastYear', title: '📅 전년 동월', isFull: false },
 ];
 
@@ -324,40 +304,67 @@ export default function QueryPage() {
       {/* ─── 기본 요약 ─── */}
       <h2 style={sectionH}>📌 매출 한눈에</h2>
 
-      {/* 1행: 이번주 + 이번달 (상세) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+      {/* 올해 누적 (full width) */}
+      <div style={{ marginBottom: 12 }}>
         <PeriodSummaryCard
-          title="이번주"
-          data={summaries.thisWeek}
-          loading={!summaries.thisWeek}
-          error={summaries.thisWeek?.error || summaries.thisWeek?.ordersError}
-          range={summaries.thisWeek?.range}
-        />
-        <PeriodSummaryCard
-          title="이번달"
-          data={summaries.thisMonth}
-          loading={!summaries.thisMonth}
-          error={summaries.thisMonth?.error || summaries.thisMonth?.ordersError}
-          range={summaries.thisMonth?.range}
-          color="#7c3aed"
-        />
-      </div>
-
-      {/* 2행: 지난달, 올해, 전년동월 (간단) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-        <SimpleSummaryCard
-          title="📅 지난달"
-          data={summaries.lastMonth}
-          loading={!summaries.lastMonth}
-          error={summaries.lastMonth?.error}
-          range={summaries.lastMonth?.range}
-        />
-        <SimpleSummaryCard
           title="📅 올해 누적"
           data={summaries.thisYear}
           loading={!summaries.thisYear}
           error={summaries.thisYear?.error}
           range={summaries.thisYear?.range}
+          color="#0891b2"
+        />
+      </div>
+
+      {/* 이번달 / 다음달 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <PeriodSummaryCard
+          title="📅 이번달"
+          data={summaries.thisMonth}
+          loading={!summaries.thisMonth}
+          error={summaries.thisMonth?.error || summaries.thisMonth?.ordersError}
+          range={summaries.thisMonth?.range}
+          color="#2563eb"
+        />
+        <PeriodSummaryCard
+          title="📅 다음달"
+          data={summaries.nextMonth}
+          loading={!summaries.nextMonth}
+          error={summaries.nextMonth?.error}
+          range={summaries.nextMonth?.range}
+          color="#7c3aed"
+        />
+      </div>
+
+      {/* 이번주 / 다음주 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <PeriodSummaryCard
+          title="📅 이번주"
+          data={summaries.thisWeek}
+          loading={!summaries.thisWeek}
+          error={summaries.thisWeek?.error}
+          range={summaries.thisWeek?.range}
+          color="#2563eb"
+        />
+        <PeriodSummaryCard
+          title="📅 다음주"
+          data={summaries.nextWeek}
+          loading={!summaries.nextWeek}
+          error={summaries.nextWeek?.error}
+          range={summaries.nextWeek?.range}
+          color="#7c3aed"
+        />
+      </div>
+
+      {/* 저번달 / 전년동월 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+        <PeriodSummaryCard
+          title="📅 저번달"
+          data={summaries.lastMonth}
+          loading={!summaries.lastMonth}
+          error={summaries.lastMonth?.error}
+          range={summaries.lastMonth?.range}
+          color="#6b7280"
         />
         <PeriodSummaryCard
           title="📅 전년 동월"

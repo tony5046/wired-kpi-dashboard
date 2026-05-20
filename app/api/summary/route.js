@@ -17,8 +17,18 @@ function resolve(period) {
       const { year, week } = getIsoWeek(now);
       return weekToDateRange(year, week);
     }
+    case 'nextWeek': {
+      const next = new Date(now);
+      next.setDate(next.getDate() + 7);
+      const { year, week } = getIsoWeek(next);
+      return weekToDateRange(year, week);
+    }
     case 'thisMonth':
       return monthToDateRange(now.getFullYear(), now.getMonth() + 1);
+    case 'nextMonth': {
+      const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return monthToDateRange(d.getFullYear(), d.getMonth() + 1);
+    }
     case 'lastMonth': {
       const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       return monthToDateRange(d.getFullYear(), d.getMonth() + 1);
@@ -56,18 +66,15 @@ export async function GET(request) {
     const response = {
       period,
       range,
-      // 매출 (실제 - 출고완료된 것)
-      actualSales: ordersTotal.salesReleased || 0,
-      actualMargin: ordersTotal.marginReleased || 0,
-      // 매출 (전체 - 출고대기 포함)
-      totalSales: ordersTotal.sales || 0,
-      totalMargin: ordersTotal.margin || 0,
-      // 예상매출 (마켓 등록 시 입력값)
+      // 예상 매출 (마켓 등록값 합)
       estimatedSales: marketsTotal.estimatedSales || 0,
-      // 주문건수 (중복 제거)
+      // 예상 + 실제 매출 (ENDED는 실제, 나머지는 예상)
+      mixedSales: combined.mixedSales || 0,
+      // (참고용 유지)
+      totalSales: ordersTotal.sales || 0,
+      actualSales: ordersTotal.salesReleased || 0,
+      totalMargin: ordersTotal.margin || 0,
       uniqueCustomers: ordersTotal.uniqueCustomers || 0,
-      releasedUniqueCustomers: ordersTotal.releasedUniqueCustomers || 0,
-      // 마켓 건수
       marketsAll: marketsTotal.marketsAll || 0,
       marketsActive: marketsTotal.marketsActive || 0,
       marketsEnded: marketsTotal.marketsEnded || 0,
