@@ -78,12 +78,35 @@ async function runQuery(params) {
   return res.json();
 }
 
+function Spinner({ size = 16, color = '#2563eb' }) {
+  return (
+    <span style={{
+      display: 'inline-block',
+      width: size, height: size,
+      border: `2px solid ${color}33`,
+      borderTopColor: color,
+      borderRadius: '50%',
+      animation: 'wkd-spin 0.8s linear infinite',
+      verticalAlign: 'middle',
+    }} />
+  );
+}
+
+function LoadingRow({ size = 16, color = '#2563eb', text = '데이터 가져오는 중...' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6b7280', fontSize: 13 }}>
+      <Spinner size={size} color={color} />
+      <span>{text}</span>
+    </div>
+  );
+}
+
 function QuickTotalCard({ label, data, loading, error }) {
   return (
     <div style={quickTotalCard}>
       <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{label} 매출</div>
       {loading ? (
-        <div style={{ fontSize: 14, color: '#9ca3af' }}>로딩...</div>
+        <LoadingRow size={14} text="로딩 중..." />
       ) : error ? (
         <div style={{ fontSize: 12, color: '#ef4444' }}>오류</div>
       ) : (
@@ -105,7 +128,9 @@ function QuickTopList({ label, data, loading, error, onClickItem }) {
     <div style={quickTopCard}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{label}</div>
       {loading ? (
-        <div style={{ fontSize: 13, color: '#9ca3af' }}>로딩...</div>
+        <div style={{ padding: '12px 0' }}>
+          <LoadingRow size={14} text="순위 집계 중..." />
+        </div>
       ) : error ? (
         <div style={{ fontSize: 12, color: '#ef4444' }}>오류 발생</div>
       ) : (
@@ -278,6 +303,10 @@ export default function QueryPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
+      <style>{`
+        @keyframes wkd-spin { to { transform: rotate(360deg); } }
+        @keyframes wkd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      `}</style>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, margin: 0 }}>🔎 매출 조회기</h1>
@@ -365,8 +394,10 @@ export default function QueryPage() {
                     background: '#2563eb', color: '#fff',
                     border: 'none', borderRadius: 8,
                     cursor: searchLoading ? 'wait' : 'pointer',
-                    opacity: searchLoading ? 0.6 : 1,
+                    opacity: searchLoading ? 0.7 : 1,
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
                   }}>
+                  {searchLoading && <Spinner size={14} color="#fff" />}
                   {searchLoading ? '조회 중...' : '▶ 실행'}
                 </button>
                 <button onClick={handleAddFavorite}
@@ -384,7 +415,13 @@ export default function QueryPage() {
               </p>
             </div>
 
-            {searchError && (
+            {searchLoading && (
+              <div style={{ ...card, marginTop: 16, textAlign: 'center', padding: 32 }}>
+                <LoadingRow size={20} text="결과 계산 중... (큰 기간 선택 시 10초 이상 걸릴 수 있어요)" />
+              </div>
+            )}
+
+            {searchError && !searchLoading && (
               <div style={{ ...card, marginTop: 16, color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', fontSize: 14 }}>
                 오류: {searchError}
               </div>
