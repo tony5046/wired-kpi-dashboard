@@ -1,56 +1,9 @@
 'use client';
 import { useSession, signIn } from 'next-auth/react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 
-const METRICS = [
-  { value: 'sales', label: '💰 매출' },
-  { value: 'margin', label: '💵 공헌이익' },
-  { value: 'count', label: '📦 주문 건수' },
-];
-
-const PERIODS = [
-  { value: 'thisWeek', label: '이번주' },
-  { value: 'lastWeek', label: '지난주' },
-  { value: 'thisMonth', label: '이번달' },
-  { value: 'lastMonth', label: '지난달' },
-  { value: 'thisQuarter', label: '이번분기' },
-  { value: 'lastQuarter', label: '지난분기' },
-  { value: 'thisYear', label: '올해' },
-  { value: 'lastYear', label: '작년' },
-];
-
-const GROUPS = [
-  { value: 'total', label: '🌐 전체 합계' },
-  { value: 'seller', label: '🏪 셀러별' },
-  { value: 'brand', label: '🏷️ 브랜드별' },
-  { value: 'market', label: '🛒 마켓별' },
-  { value: 'manager', label: '👤 셀러담당자별' },
-];
-
-const LIMITS = [
-  { value: 5, label: 'TOP 5' },
-  { value: 10, label: 'TOP 10' },
-  { value: 20, label: 'TOP 20' },
-  { value: 'all', label: '전체' },
-];
-
-const FAVORITES_KEY = 'wired_query_favorites_v1';
-
-// Default Quick Stats (자동 표시)
-const QUICK_TOTAL_QUERIES = [
-  { id: 'tw', label: '이번주', params: { metric: 'sales', period: 'thisWeek', group: 'total' } },
-  { id: 'tm', label: '이번달', params: { metric: 'sales', period: 'thisMonth', group: 'total' } },
-  { id: 'lm', label: '지난달', params: { metric: 'sales', period: 'lastMonth', group: 'total' } },
-  { id: 'ty', label: '올해 누적', params: { metric: 'sales', period: 'thisYear', group: 'total' } },
-];
-
-const QUICK_TOP_QUERIES = [
-  { id: 'tm_sel', label: '🏪 이번달 셀러 TOP 3', params: { metric: 'sales', period: 'thisMonth', group: 'seller', limit: 3 } },
-  { id: 'tm_brd', label: '🏷️ 이번달 브랜드 TOP 3', params: { metric: 'sales', period: 'thisMonth', group: 'brand', limit: 3 } },
-  { id: 'tm_mgr', label: '👤 이번달 담당자 TOP 3', params: { metric: 'sales', period: 'thisMonth', group: 'manager', limit: 3 } },
-];
-
+// ───── 유틸 ─────
 function won(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
   return Number(n).toLocaleString('ko-KR') + '원';
@@ -59,71 +12,78 @@ function count(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
   return Number(n).toLocaleString('ko-KR') + '건';
 }
-
-function buildLabel(params) {
-  const m = METRICS.find(x => x.value === params.metric)?.label || params.metric;
-  const p = PERIODS.find(x => x.value === params.period)?.label || params.period;
-  const g = GROUPS.find(x => x.value === params.group)?.label || params.group;
-  if (params.group === 'total') return `${p} ${m} 합계`;
-  const lim = LIMITS.find(x => String(x.value) === String(params.limit))?.label || `TOP ${params.limit}`;
-  return `${p} ${g} ${lim} (${m})`;
-}
-
-async function runQuery(params) {
-  const res = await fetch('/api/query', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  return res.json();
+function pct(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return '-';
+  return Number(n).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '%';
 }
 
 function Spinner({ size = 16, color = '#2563eb' }) {
   return (
     <span style={{
-      display: 'inline-block',
-      width: size, height: size,
-      border: `2px solid ${color}33`,
-      borderTopColor: color,
-      borderRadius: '50%',
-      animation: 'wkd-spin 0.8s linear infinite',
+      display: 'inline-block', width: size, height: size,
+      border: `2px solid ${color}33`, borderTopColor: color,
+      borderRadius: '50%', animation: 'wkd-spin 0.8s linear infinite',
       verticalAlign: 'middle',
     }} />
   );
 }
 
-function LoadingRow({ size = 16, color = '#2563eb', text = '데이터 가져오는 중...' }) {
+function LoadingRow({ size = 16, text = '데이터 가져오는 중...' }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#6b7280', fontSize: 13 }}>
-      <Spinner size={size} color={color} />
+      <Spinner size={size} />
       <span>{text}</span>
     </div>
   );
 }
 
-function fmtRange(range) {
-  if (!range) return '';
-  return `${range.startDate} ~ ${range.endDate}`;
+// ───── 기본 요약 카드 ─────
+function PeriodSummaryCard({ title, data, loading, error, range, color = '#2563eb' }) {
+  return (
+    <div style={summaryCard}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>
+        {range ? `${range.startDate} ~ ${range.endDate}` : ' '}
+      </div>
+
+      {loading ? (
+        <LoadingRow text="로딩 중..." />
+      ) : error ? (
+        <div style={{ fontSize: 12, color: '#ef4444' }}>로드 실패: {error}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Row label="총 매출 (포함)" value={won(data?.totalSales)} hint="출고 대기 포함" color={color} bold />
+          <Row label="총 매출 (미포함)" value={won(data?.actualSales)} hint="출고 완료만" />
+          <Row label="누적 예상매출" value={won(data?.estimatedSales)} hint="마켓 등록값" />
+          <Row label="공구 마켓 (총)" value={count(data?.marketsAll)} />
+          <Row label="공구 마켓 (진행)" value={count(data?.marketsActive)} hint="취소 제외" />
+        </div>
+      )}
+    </div>
+  );
 }
 
-function QuickTotalCard({ label, data, loading, error }) {
+function SimpleSummaryCard({ title, data, loading, error, range }) {
   return (
-    <div style={quickTotalCard}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{label} 매출</div>
-      <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 6 }}>
-        {data?.range ? fmtRange(data.range) : ' '}
+    <div style={summaryCard}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>
+        {range ? `${range.startDate} ~ ${range.endDate}` : ' '}
       </div>
+
       {loading ? (
-        <LoadingRow size={14} text="로딩 중..." />
+        <LoadingRow text="로딩 중..." />
       ) : error ? (
         <div style={{ fontSize: 12, color: '#ef4444' }}>오류</div>
       ) : (
         <>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 4 }}>
-            {won(data?.total?.sales)}
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb', marginBottom: 6 }}>
+            {won(data?.totalSales)}
           </div>
-          <div style={{ fontSize: 11, color: '#9ca3af' }}>
-            마진 {won(data?.total?.margin)} · {count(data?.total?.count)}
+          <div style={{ fontSize: 12, color: '#6b7280' }}>
+            마진 {won(data?.totalMargin)}<br />
+            예상매출 {won(data?.estimatedSales)}<br />
+            마켓 {count(data?.marketsAll)} (진행 {count(data?.marketsActive)})
           </div>
         </>
       )}
@@ -131,178 +91,184 @@ function QuickTotalCard({ label, data, loading, error }) {
   );
 }
 
-function QuickTopList({ label, data, loading, error, onClickItem }) {
+function Row({ label, value, hint, bold, color }) {
   return (
-    <div style={quickTopCard}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-        {data?.range && (
-          <div style={{ fontSize: 10, color: '#9ca3af' }}>{fmtRange(data.range)}</div>
-        )}
-      </div>
-      {loading ? (
-        <div style={{ padding: '12px 0' }}>
-          <LoadingRow size={14} text="순위 집계 중..." />
-        </div>
-      ) : error ? (
-        <div style={{ fontSize: 12, color: '#ef4444' }}>오류 발생</div>
-      ) : (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <span style={{ fontSize: 12, color: '#6b7280' }}>
+        {label}
+        {hint && <span style={{ marginLeft: 4, fontSize: 10, color: '#9ca3af' }}>({hint})</span>}
+      </span>
+      <span style={{ fontSize: bold ? 16 : 14, fontWeight: bold ? 700 : 500, color: color || '#111' }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// ───── 셀러/브랜드 리스트 (검색 + 필터) ─────
+function ListCard({ title, emoji, rows, loading, columns, sortOptions, range }) {
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState(sortOptions[0].value);
+
+  const filtered = useMemo(() => {
+    if (!rows) return [];
+    const q = search.trim().toLowerCase();
+    const arr = q
+      ? rows.filter(r => {
+          const hay = [
+            r.name,
+            r.manager || '',
+            ...(r.brands || []),
+            ...(r.sellers || []),
+          ].join(' ').toLowerCase();
+          return hay.includes(q);
+        })
+      : rows;
+
+    return [...arr].sort((a, b) => {
+      const av = a[sortBy] || 0;
+      const bv = b[sortBy] || 0;
+      return bv - av;
+    });
+  }, [rows, search, sortBy]);
+
+  return (
+    <section style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
         <div>
-          {(data?.rows || []).map((r, i) => (
-            <div key={r.name} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '6px 0', borderBottom: i < (data.rows.length - 1) ? '1px solid #f3f4f6' : 'none',
-            }}>
-              <span style={{ fontSize: 13 }}>
-                <span style={{ color: '#9ca3af', marginRight: 6 }}>#{i + 1}</span>
-                <strong>{r.name}</strong>
-              </span>
-              <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{won(r.sales)}</span>
-            </div>
+          <h2 style={{ fontSize: 16, margin: 0, fontWeight: 600 }}>
+            {emoji} {title} <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>({filtered.length}개)</span>
+          </h2>
+          {range && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{range.startDate} ~ {range.endDate}</div>}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="🔎 이름/담당자 검색"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            padding: '8px 12px', fontSize: 13, flex: 1, minWidth: 200,
+            border: '1px solid #d1d5db', borderRadius: 6,
+          }}
+        />
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
+          {sortOptions.map(o => (
+            <button key={o.value} onClick={() => setSortBy(o.value)} style={sortBtn(sortBy === o.value)}>
+              {o.label}
+            </button>
           ))}
         </div>
+      </div>
+
+      {loading ? (
+        <LoadingRow text="목록 가져오는 중..." />
+      ) : filtered.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: 20 }}>
+          {search ? '검색 결과 없음' : '데이터 없음'}
+        </p>
+      ) : (
+        <div style={{ overflowX: 'auto', maxHeight: 600, overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+              <tr>
+                <th style={{ ...th, textAlign: 'left', width: 40 }}>#</th>
+                {columns.map(c => (
+                  <th key={c.key} style={{ ...th, textAlign: c.align || 'right' }}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r, i) => (
+                <tr key={r.name}>
+                  <td style={{ ...td, textAlign: 'left', color: '#9ca3af' }}>{i + 1}</td>
+                  {columns.map(c => (
+                    <td key={c.key} style={{ ...td, textAlign: c.align || 'right' }}>
+                      {c.render ? c.render(r) : (r[c.key] ?? '-')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </div>
+    </section>
   );
 }
 
-function btn(active) {
-  return {
-    padding: '8px 14px',
-    fontSize: 13,
-    fontWeight: active ? 600 : 500,
-    background: active ? '#2563eb' : '#fff',
-    color: active ? '#fff' : '#374151',
-    border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
-    borderRadius: 6,
-    cursor: 'pointer',
-    transition: 'all 0.1s',
-  };
-}
-
-function ButtonGroup({ options, value, onChange }) {
+function ManagerList({ rows, loading, range }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {options.map(o => (
-        <button key={o.value} onClick={() => onChange(o.value)} style={btn(String(value) === String(o.value))}>
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <section style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h2 style={{ fontSize: 16, margin: 0, fontWeight: 600 }}>👤 이번달 담당자별 매출</h2>
+        {range && <div style={{ fontSize: 11, color: '#9ca3af' }}>{range.startDate} ~ {range.endDate}</div>}
+      </div>
+      {loading ? (
+        <LoadingRow text="목록 가져오는 중..." />
+      ) : !rows || rows.length === 0 ? (
+        <p style={{ fontSize: 13, color: '#9ca3af' }}>데이터 없음</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f9fafb' }}>
+              <th style={{ ...th, textAlign: 'left', width: 40 }}>#</th>
+              <th style={{ ...th, textAlign: 'left' }}>담당자</th>
+              <th style={th}>매출</th>
+              <th style={th}>마진</th>
+              <th style={th}>고객(중복제거)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.name}>
+                <td style={{ ...td, textAlign: 'left', color: '#9ca3af' }}>{i + 1}</td>
+                <td style={{ ...td, textAlign: 'left', fontWeight: 500 }}>{r.name}</td>
+                <td style={td}>{won(r.sales)}</td>
+                <td style={td}>{won(r.margin)}</td>
+                <td style={td}>{count(r.uniqueCustomers)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
+
+// ───── 메인 페이지 ─────
+const PERIODS = [
+  { key: 'thisWeek', title: '📅 이번주', isFull: false },
+  { key: 'thisMonth', title: '📅 이번달', isFull: true }, // 셀러/브랜드 리스트도 가져옴
+  { key: 'lastMonth', title: '📅 지난달', isFull: false },
+  { key: 'thisYear', title: '📅 올해 누적', isFull: false },
+  { key: 'sameMonthLastYear', title: '📅 전년 동월', isFull: false },
+];
 
 export default function QueryPage() {
   const { data: session, status } = useSession();
+  const [summaries, setSummaries] = useState({});
 
-  // Quick Stats 자동 로딩
-  const [quickTotals, setQuickTotals] = useState({});
-  const [quickTops, setQuickTops] = useState({});
-  const [quickLoading, setQuickLoading] = useState(true);
-
-  // 검색 UI 상태
-  const [metric, setMetric] = useState('sales');
-  const [period, setPeriod] = useState('thisMonth');
-  const [group, setGroup] = useState('seller');
-  const [limit, setLimit] = useState(10);
-
-  const [favorites, setFavorites] = useState([]);
-  const [result, setResult] = useState(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState(null);
-
-  // 즐겨찾기 로드
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(FAVORITES_KEY);
-      if (saved) setFavorites(JSON.parse(saved));
-    } catch {}
-  }, []);
-
-  const saveFavorites = useCallback((list) => {
-    setFavorites(list);
-    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(list)); } catch {}
-  }, []);
-
-  // Quick Stats 로딩 — 페이지 진입 시 1회
   useEffect(() => {
     if (!session) return;
-    setQuickLoading(true);
 
-    const totals = {};
-    const tops = {};
-
-    Promise.all([
-      ...QUICK_TOTAL_QUERIES.map(async (q) => {
-        try {
-          const data = await runQuery(q.params);
-          if (data.error) totals[q.id] = { error: data.message || data.error };
-          else totals[q.id] = data;
-        } catch (e) {
-          totals[q.id] = { error: e.message };
-        }
-      }),
-      ...QUICK_TOP_QUERIES.map(async (q) => {
-        try {
-          const data = await runQuery(q.params);
-          if (data.error) tops[q.id] = { error: data.message || data.error };
-          else tops[q.id] = data;
-        } catch (e) {
-          tops[q.id] = { error: e.message };
-        }
-      }),
-    ]).then(() => {
-      setQuickTotals(totals);
-      setQuickTops(tops);
-      setQuickLoading(false);
+    PERIODS.forEach(p => {
+      const qs = p.isFull ? `?period=${p.key}&full=true` : `?period=${p.key}`;
+      fetch('/api/summary' + qs)
+        .then(r => r.json())
+        .then(d => setSummaries(prev => ({ ...prev, [p.key]: d })))
+        .catch(e => setSummaries(prev => ({ ...prev, [p.key]: { error: e.message } })));
     });
   }, [session]);
 
-  const handleRun = async (params) => {
-    setSearchLoading(true);
-    setSearchError(null);
-    try {
-      const data = await runQuery(params);
-      if (data.error) setSearchError(data.message || data.error);
-      else setResult(data);
-    } catch (e) {
-      setSearchError(e.message);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleSearchSubmit = () => handleRun({ metric, period, group, limit });
-
-  const handleAddFavorite = () => {
-    const params = { metric, period, group, limit };
-    const label = buildLabel(params);
-    if (favorites.some(f => f.label === label)) {
-      alert('이미 즐겨찾기에 있습니다');
-      return;
-    }
-    saveFavorites([...favorites, { id: Date.now(), label, params }]);
-  };
-
-  const handleRunFavorite = (fav) => {
-    setMetric(fav.params.metric);
-    setPeriod(fav.params.period);
-    setGroup(fav.params.group);
-    setLimit(fav.params.limit);
-    handleRun(fav.params);
-  };
-
-  const handleRemoveFavorite = (id) => {
-    saveFavorites(favorites.filter(f => f.id !== id));
-  };
-
   if (status === 'loading') return <main style={{ padding: 40 }}>로딩 중...</main>;
-
   if (!session) {
     return (
       <main style={{ padding: 40, maxWidth: 480, margin: '80px auto', textAlign: 'center' }}>
         <h1 style={{ fontSize: 28 }}>로그인 필요</h1>
-        <p style={{ color: '#666' }}>회사 계정으로 로그인해주세요.</p>
         <button onClick={() => signIn('google')} style={{
           padding: '12px 24px', fontSize: 16, background: '#4285F4', color: '#fff',
           border: 'none', borderRadius: 8, cursor: 'pointer',
@@ -311,25 +277,20 @@ export default function QueryPage() {
     );
   }
 
-  // 에러 체크: 토큰 만료
-  const tokenExpired = Object.values(quickTotals).some(d => d?.error && d.error.includes('EXPIRED'));
+  const tokenExpired = Object.values(summaries).some(d => d?.ordersError?.includes('EXPIRED') || d?.marketsError?.includes('EXPIRED') || d?.message?.includes('EXPIRED'));
+
+  const thisMonth = summaries.thisMonth;
 
   return (
-    <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
-      <style>{`
-        @keyframes wkd-spin { to { transform: rotate(360deg); } }
-        @keyframes wkd-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-      `}</style>
+    <main style={{ padding: 24, maxWidth: 1400, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
+      <style>{`@keyframes wkd-spin { to { transform: rotate(360deg); } }`}</style>
+
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, margin: 0 }}>🔎 매출 조회기</h1>
-          <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
-            기본 요약 + 원하는 데이터 직접 검색
-          </p>
+          <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>기본 요약 + 셀러/브랜드 검색</p>
         </div>
-        <Link href="/" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none' }}>
-          ← 대시보드로
-        </Link>
+        <Link href="/" style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none' }}>← 대시보드로</Link>
       </header>
 
       {tokenExpired && (
@@ -338,249 +299,165 @@ export default function QueryPage() {
           background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8,
           fontSize: 13, color: '#92400e',
         }}>
-          ⚠️ 와이어드민 토큰이 만료됐어요. 매출 데이터를 가져오지 못합니다. 새 토큰 발급 필요.
+          ⚠️ 와이어드민 토큰이 만료됐어요. 새 토큰 발급 필요.
         </div>
       )}
 
-      {/* 데이터 기준 안내 */}
       <div style={{
         padding: '10px 14px', marginBottom: 16,
         background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8,
-        fontSize: 12, color: '#1e40af',
-        display: 'flex', flexWrap: 'wrap', gap: 16,
+        fontSize: 12, color: '#1e40af', display: 'flex', flexWrap: 'wrap', gap: 16,
       }}>
-        <span><strong>📊 매출 기준:</strong> 와이어드민 총 결제금액 (배송비 포함)</span>
-        <span><strong>📅 기간 기준:</strong> 발송일 (출고 처리 완료일)</span>
-        <span><strong>🔄 갱신 주기:</strong> 매일 새벽 3시 자동 + 페이지 진입 시</span>
+        <span><strong>📊 매출:</strong> 와이어드민 주문 결제금액 합 (배송비 포함)</span>
+        <span><strong>📅 기간 기준:</strong> 발송일</span>
+        <span><strong>💡 예상매출:</strong> 마켓 등록 시 입력값 (단위: 백만원 × {(1_000_000).toLocaleString()})</span>
+        <span><strong>🔄 갱신:</strong> 매일 새벽 3시 + 페이지 진입</span>
       </div>
 
-      {/* ━━ 1. 기본 요약 (자동) ━━ */}
-      <section style={{ marginBottom: 24 }}>
-        <h2 style={sectionTitle}>📌 매출 한눈에</h2>
+      {/* ─── 기본 요약 ─── */}
+      <h2 style={sectionH}>📌 매출 한눈에</h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-          {QUICK_TOTAL_QUERIES.map(q => (
-            <QuickTotalCard
-              key={q.id}
-              label={q.label}
-              data={quickTotals[q.id]}
-              loading={quickLoading}
-              error={quickTotals[q.id]?.error}
-            />
-          ))}
-        </div>
+      {/* 1행: 이번주 + 이번달 (상세) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <PeriodSummaryCard
+          title="이번주"
+          data={summaries.thisWeek}
+          loading={!summaries.thisWeek}
+          error={summaries.thisWeek?.error || summaries.thisWeek?.ordersError}
+          range={summaries.thisWeek?.range}
+        />
+        <PeriodSummaryCard
+          title="이번달"
+          data={summaries.thisMonth}
+          loading={!summaries.thisMonth}
+          error={summaries.thisMonth?.error || summaries.thisMonth?.ordersError}
+          range={summaries.thisMonth?.range}
+          color="#7c3aed"
+        />
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          {QUICK_TOP_QUERIES.map(q => (
-            <QuickTopList
-              key={q.id}
-              label={q.label}
-              data={quickTops[q.id]}
-              loading={quickLoading}
-              error={quickTops[q.id]?.error}
-            />
-          ))}
-        </div>
-      </section>
+      {/* 2행: 지난달, 올해, 전년동월 (간단) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+        <SimpleSummaryCard
+          title="📅 지난달"
+          data={summaries.lastMonth}
+          loading={!summaries.lastMonth}
+          error={summaries.lastMonth?.error}
+          range={summaries.lastMonth?.range}
+        />
+        <SimpleSummaryCard
+          title="📅 올해 누적"
+          data={summaries.thisYear}
+          loading={!summaries.thisYear}
+          error={summaries.thisYear?.error}
+          range={summaries.thisYear?.range}
+        />
+        <PeriodSummaryCard
+          title="📅 전년 동월"
+          data={summaries.sameMonthLastYear}
+          loading={!summaries.sameMonthLastYear}
+          error={summaries.sameMonthLastYear?.error}
+          range={summaries.sameMonthLastYear?.range}
+          color="#6b7280"
+        />
+      </div>
 
-      {/* ━━ 2. 검색 (수동) ━━ */}
-      <section style={{ marginBottom: 16 }}>
-        <h2 style={sectionTitle}>🔍 직접 검색</h2>
+      {/* ─── 셀러 리스트 ─── */}
+      <h2 style={sectionH}>🏪 이번달 셀러</h2>
+      <ListCard
+        title="셀러 전체"
+        emoji=""
+        loading={!thisMonth || !thisMonth.sellers}
+        rows={thisMonth?.sellers}
+        range={thisMonth?.range}
+        sortOptions={[
+          { value: 'actualSales', label: '매출' },
+          { value: 'uniqueCustomers', label: '주문건수' },
+          { value: 'estimatedSales', label: '예상매출' },
+          { value: 'achievementRate', label: '달성률' },
+        ]}
+        columns={[
+          { key: 'name', label: '셀러명', align: 'left' },
+          { key: 'manager', label: '담당자', align: 'left' },
+          { key: 'actualSales', label: '매출', render: r => won(r.actualSales) },
+          { key: 'uniqueCustomers', label: '주문건수\n(중복제거)', render: r => count(r.uniqueCustomers) },
+          { key: 'estimatedSales', label: '예상매출', render: r => won(r.estimatedSales) },
+          { key: 'achievementRate', label: '달성률', render: r => {
+            const v = r.achievementRate;
+            if (v === null || v === undefined) return '-';
+            const color = v >= 100 ? '#10b981' : v >= 80 ? '#f59e0b' : '#ef4444';
+            return <span style={{ color, fontWeight: 600 }}>{pct(v)}</span>;
+          }},
+        ]}
+      />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-          <div>
-            <div style={card}>
-              <div style={fieldRow}>
-                <label style={fieldLabel}>📊 무엇을</label>
-                <ButtonGroup options={METRICS} value={metric} onChange={setMetric} />
-              </div>
+      <div style={{ height: 16 }} />
 
-              <div style={fieldRow}>
-                <label style={fieldLabel}>📅 언제</label>
-                <ButtonGroup options={PERIODS} value={period} onChange={setPeriod} />
-              </div>
+      {/* ─── 브랜드 리스트 ─── */}
+      <h2 style={sectionH}>🏷️ 이번달 브랜드</h2>
+      <ListCard
+        title="브랜드 전체"
+        emoji=""
+        loading={!thisMonth || !thisMonth.brands}
+        rows={thisMonth?.brands}
+        range={thisMonth?.range}
+        sortOptions={[
+          { value: 'actualSales', label: '매출' },
+          { value: 'uniqueCustomers', label: '주문건수' },
+          { value: 'estimatedSales', label: '예상매출' },
+          { value: 'achievementRate', label: '달성률' },
+        ]}
+        columns={[
+          { key: 'name', label: '브랜드명', align: 'left' },
+          { key: 'sellers', label: '셀러', align: 'left', render: r => (r.sellers || []).slice(0, 3).join(', ') + ((r.sellers?.length || 0) > 3 ? '...' : '') },
+          { key: 'actualSales', label: '매출', render: r => won(r.actualSales) },
+          { key: 'uniqueCustomers', label: '주문건수\n(중복제거)', render: r => count(r.uniqueCustomers) },
+          { key: 'estimatedSales', label: '예상매출', render: r => won(r.estimatedSales) },
+          { key: 'achievementRate', label: '달성률', render: r => {
+            const v = r.achievementRate;
+            if (v === null || v === undefined) return '-';
+            const color = v >= 100 ? '#10b981' : v >= 80 ? '#f59e0b' : '#ef4444';
+            return <span style={{ color, fontWeight: 600 }}>{pct(v)}</span>;
+          }},
+        ]}
+      />
 
-              <div style={fieldRow}>
-                <label style={fieldLabel}>🔍 무엇 별로</label>
-                <ButtonGroup options={GROUPS} value={group} onChange={setGroup} />
-              </div>
+      <div style={{ height: 16 }} />
 
-              {group !== 'total' && (
-                <div style={fieldRow}>
-                  <label style={fieldLabel}>📈 정렬</label>
-                  <ButtonGroup options={LIMITS} value={limit} onChange={setLimit} />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button onClick={handleSearchSubmit} disabled={searchLoading}
-                  style={{
-                    padding: '10px 24px', fontSize: 14, fontWeight: 600,
-                    background: '#2563eb', color: '#fff',
-                    border: 'none', borderRadius: 8,
-                    cursor: searchLoading ? 'wait' : 'pointer',
-                    opacity: searchLoading ? 0.7 : 1,
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                  }}>
-                  {searchLoading && <Spinner size={14} color="#fff" />}
-                  {searchLoading ? '조회 중...' : '▶ 실행'}
-                </button>
-                <button onClick={handleAddFavorite}
-                  style={{
-                    padding: '10px 16px', fontSize: 14,
-                    background: '#fff', color: '#374151',
-                    border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer',
-                  }}>
-                  ⭐ 즐겨찾기 추가
-                </button>
-              </div>
-
-              <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 12 }}>
-                현재 질문: <strong style={{ color: '#374151' }}>{buildLabel({ metric, period, group, limit })}</strong>
-              </p>
-            </div>
-
-            {searchLoading && (
-              <div style={{ ...card, marginTop: 16, textAlign: 'center', padding: 32 }}>
-                <LoadingRow size={20} text="결과 계산 중... (큰 기간 선택 시 10초 이상 걸릴 수 있어요)" />
-              </div>
-            )}
-
-            {searchError && !searchLoading && (
-              <div style={{ ...card, marginTop: 16, color: '#991b1b', background: '#fef2f2', border: '1px solid #fecaca', fontSize: 14 }}>
-                오류: {searchError}
-              </div>
-            )}
-
-            {result && !searchLoading && (
-              <div style={{ ...card, marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <h3 style={{ fontSize: 15, margin: 0, fontWeight: 600 }}>
-                    결과: {buildLabel(result.params)}
-                  </h3>
-                  <span style={{ fontSize: 12, color: '#9ca3af' }}>
-                    {result.range.startDate} ~ {result.range.endDate}
-                  </span>
-                </div>
-
-                {result.type === 'total' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                    <div style={metricBox}><div style={metricLabelSt}>매출</div><div style={metricValue}>{won(result.total.sales)}</div></div>
-                    <div style={metricBox}><div style={metricLabelSt}>공헌이익</div><div style={metricValue}>{won(result.total.margin)}</div></div>
-                    <div style={metricBox}><div style={metricLabelSt}>공헌이익률</div><div style={metricValue}>{result.total.marginRate.toLocaleString('ko-KR', {maximumFractionDigits: 2})}%</div></div>
-                    <div style={metricBox}><div style={metricLabelSt}>주문 건수</div><div style={metricValue}>{count(result.total.count)}</div></div>
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                      <thead>
-                        <tr style={{ background: '#f9fafb' }}>
-                          <th style={{ ...th, textAlign: 'left', width: 50 }}>#</th>
-                          <th style={{ ...th, textAlign: 'left' }}>이름</th>
-                          <th style={th}>매출</th>
-                          <th style={th}>공헌이익</th>
-                          <th style={th}>이익률</th>
-                          <th style={th}>건수</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.rows.map((r, i) => (
-                          <tr key={r.name}>
-                            <td style={{ ...td, textAlign: 'left', color: '#9ca3af' }}>{i + 1}</td>
-                            <td style={{ ...td, textAlign: 'left', fontWeight: 500 }}>{r.name}</td>
-                            <td style={{ ...td, fontWeight: result.metricKey === 'sales' ? 700 : 400, color: result.metricKey === 'sales' ? '#2563eb' : '#374151' }}>{won(r.sales)}</td>
-                            <td style={{ ...td, fontWeight: result.metricKey === 'margin' ? 700 : 400, color: result.metricKey === 'margin' ? '#2563eb' : '#374151' }}>{won(r.margin)}</td>
-                            <td style={td}>{r.marginRate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}%</td>
-                            <td style={{ ...td, fontWeight: result.metricKey === 'count' ? 700 : 400, color: result.metricKey === 'count' ? '#2563eb' : '#374151' }}>{count(r.count)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 12 }}>
-                      {result.totalRows.toLocaleString('ko-KR')}개 중 상위 {result.showing}개 표시
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 즐겨찾기 */}
-          <div>
-            <div style={card}>
-              <h3 style={{ fontSize: 14, color: '#6b7280', margin: '0 0 12px', fontWeight: 500 }}>
-                ⭐ 즐겨찾기 ({favorites.length})
-              </h3>
-              {favorites.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '24px 0' }}>
-                  자주 쓰는 질문을 즐겨찾기에 추가하세요
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {favorites.map(f => (
-                    <div key={f.id} style={favItem}>
-                      <button onClick={() => handleRunFavorite(f)} style={favBtn}>
-                        {f.label}
-                      </button>
-                      <button onClick={() => handleRemoveFavorite(f.id)} style={favRemove}>
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ─── 담당자 ─── */}
+      <ManagerList
+        rows={thisMonth?.bySellerManager}
+        loading={!thisMonth || !thisMonth.bySellerManager}
+        range={thisMonth?.range}
+      />
     </main>
   );
 }
 
-const sectionTitle = { fontSize: 16, margin: '0 0 12px', fontWeight: 600, color: '#111' };
+// ───── styles ─────
+const sectionH = { fontSize: 18, margin: '8px 0 12px', fontWeight: 700, color: '#111' };
 const card = {
-  padding: 20,
-  background: '#fff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 12,
+  padding: 20, background: '#fff',
+  border: '1px solid #e5e7eb', borderRadius: 12,
   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
 };
-const quickTotalCard = {
-  padding: 16,
-  background: '#fff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 10,
+const summaryCard = {
+  padding: 16, background: '#fff',
+  border: '1px solid #e5e7eb', borderRadius: 10,
 };
-const quickTopCard = {
-  padding: 16,
-  background: '#fff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 10,
-};
-const fieldRow = { marginBottom: 14 };
-const fieldLabel = { fontSize: 13, color: '#6b7280', marginBottom: 6, display: 'block' };
 const th = {
   padding: '10px 8px', borderBottom: '2px solid #e5e7eb',
-  textAlign: 'right', fontSize: 12, color: '#6b7280', fontWeight: 500,
+  fontSize: 12, color: '#6b7280', fontWeight: 500, whiteSpace: 'pre-line',
 };
 const td = {
-  padding: '10px 8px', borderBottom: '1px solid #f3f4f6', textAlign: 'right',
+  padding: '8px 8px', borderBottom: '1px solid #f3f4f6', fontSize: 13,
 };
-const metricBox = { padding: 16, background: '#f9fafb', borderRadius: 8 };
-const metricLabelSt = { fontSize: 12, color: '#6b7280', marginBottom: 4 };
-const metricValue = { fontSize: 18, fontWeight: 700, color: '#111' };
-const favItem = {
-  display: 'flex', alignItems: 'stretch',
-  border: '1px solid #e5e7eb', borderRadius: 8,
-  overflow: 'hidden',
-};
-const favBtn = {
-  flex: 1, textAlign: 'left', padding: '10px 12px',
-  fontSize: 13, fontWeight: 500,
-  background: '#fff', border: 'none', cursor: 'pointer',
-};
-const favRemove = {
-  padding: '0 10px', fontSize: 14, color: '#9ca3af',
-  background: '#f9fafb', border: 'none', borderLeft: '1px solid #e5e7eb',
-  cursor: 'pointer',
-};
+function sortBtn(active) {
+  return {
+    padding: '6px 10px', fontSize: 12,
+    background: active ? '#2563eb' : '#fff',
+    color: active ? '#fff' : '#374151',
+    border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
+    borderRadius: 5, cursor: 'pointer',
+  };
+}
