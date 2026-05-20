@@ -4,9 +4,13 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 
 // ───── 유틸 ─────
+// 매출/마진/예상매출 등 금액은 백만원 단위 표기
 function won(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
-  return Number(n).toLocaleString('ko-KR') + '원';
+  const num = Number(n);
+  if (num === 0) return '0백만원';
+  const m = num / 1_000_000;
+  return m.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '백만원';
 }
 function count(n) {
   if (n === null || n === undefined || isNaN(Number(n))) return '-';
