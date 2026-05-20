@@ -46,43 +46,104 @@ function LoadingRow({ size = 16, text = '데이터 가져오는 중...' }) {
   );
 }
 
-// ───── 기본 요약 카드 (모든 기간 동일 포맷) ─────
-function PeriodSummaryCard({ title, data, loading, error, range, color = '#2563eb' }) {
+// ───── 디자인 옵션 E — 기간 카드 ─────
+// variant: 'now' | 'future' | 'past' | 'reference'
+// target: 목표 매출 (있으면 예상매출 대신 표시)
+function PeriodCard({ title, data, loading, error, range, variant = 'past', target = null }) {
+  const styles = {
+    now: {
+      bg: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+      color: '#fff', shadow: '0 4px 14px rgba(37,99,235,0.3)',
+      labelOp: 0.85, subOp: 0.75,
+      badge: 'NOW', badgeBg: '#fff', badgeColor: '#2563eb',
+      progressTrack: 'rgba(255,255,255,0.25)', progressFill: '#fff',
+      borderColor: 'transparent',
+    },
+    future: {
+      bg: '#fff', color: '#111', shadow: '0 1px 3px rgba(0,0,0,0.06)',
+      border: '2px dashed #c084fc', labelOp: 1, subOp: 1,
+      badge: '예정', badgeBg: '#c084fc', badgeColor: '#fff',
+      progressTrack: '#f3f4f6', progressFill: 'linear-gradient(90deg, #2563eb, #7c3aed)',
+      borderColor: '#e5e7eb',
+    },
+    past: {
+      bg: '#f9fafb', color: '#374151', shadow: 'none',
+      border: '1px solid #e5e7eb', labelOp: 1, subOp: 1,
+      progressTrack: '#e5e7eb', progressFill: '#6b7280',
+      borderColor: '#e5e7eb',
+    },
+    reference: {
+      bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+      color: '#fff', shadow: '0 4px 14px rgba(8,145,178,0.25)',
+      labelOp: 0.85, subOp: 0.75,
+      progressTrack: 'rgba(255,255,255,0.25)', progressFill: '#fff',
+      borderColor: 'transparent',
+    },
+  };
+  const s = styles[variant];
+
+  // 진행률: target이 있으면 mixed/target, 없으면 mixed/estimated
+  const ref = target !== null ? target : (data?.estimatedSales || 0);
+  const refLabel = target !== null ? '목표 매출' : '예상 매출';
+  const pct = ref > 0 ? ((data?.mixedSales || 0) / ref) * 100 : 0;
+  const onWhite = variant === 'now' || variant === 'reference';
+
   return (
-    <div style={summaryCard}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 12 }}>
-        {range ? `${range.startDate} ~ ${range.endDate}` : ' '}
+    <div style={{
+      position: 'relative',
+      padding: 20, borderRadius: 14,
+      background: s.bg, color: s.color,
+      boxShadow: s.shadow,
+      border: s.border || 'none',
+      transition: 'transform 0.15s',
+    }}>
+      {s.badge && (
+        <div style={{
+          position: 'absolute', top: -10, right: 16,
+          background: s.badgeBg, color: s.badgeColor,
+          padding: '3px 12px', borderRadius: 14,
+          fontSize: 11, fontWeight: 700,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        }}>{s.badge}</div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+        <div style={{ fontSize: 15, fontWeight: 700 }}>📅 {title}</div>
+        {range && <div style={{ fontSize: 11, opacity: s.subOp }}>{range.startDate} ~ {range.endDate}</div>}
       </div>
 
       {loading ? (
-        <LoadingRow text="로딩 중..." />
+        <LoadingRow size={14} text="로딩 중..." />
       ) : error ? (
-        <div style={{ fontSize: 12, color: '#ef4444' }}>로드 실패: {error}</div>
+        <div style={{ fontSize: 12, color: onWhite ? 'rgba(255,255,255,0.95)' : '#ef4444' }}>로드 실패</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Row label="예상 매출" value={won(data?.estimatedSales)} color={color} bold />
-          <Row label="예상매출 + 실제매출" value={won(data?.mixedSales)} />
-          <Row
-            label="공구마켓 (총/진행)"
-            value={`${count(data?.marketsAll)} / ${count(data?.marketsActive)}`}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, opacity: s.labelOp, marginBottom: 4 }}>예상매출 + 실제매출</div>
+            <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{won(data?.mixedSales)}</div>
+          </div>
 
-function Row({ label, value, hint, bold, color }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-      <span style={{ fontSize: 12, color: '#6b7280' }}>
-        {label}
-        {hint && <span style={{ marginLeft: 4, fontSize: 10, color: '#9ca3af' }}>({hint})</span>}
-      </span>
-      <span style={{ fontSize: bold ? 16 : 14, fontWeight: bold ? 700 : 500, color: color || '#111' }}>
-        {value}
-      </span>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, opacity: s.labelOp }}>
+              <span>{refLabel} {won(ref)}</span>
+              <span style={{ fontWeight: 600 }}>{pct.toFixed(0)}%</span>
+            </div>
+            <div style={{ height: 6, background: s.progressTrack, borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(pct, 100)}%`, height: '100%',
+                background: s.progressFill, borderRadius: 3,
+              }} />
+            </div>
+          </div>
+
+          <div style={{
+            fontSize: 12, opacity: s.subOp, paddingTop: 10,
+            borderTop: `1px solid ${onWhite ? 'rgba(255,255,255,0.2)' : '#e5e7eb'}`,
+          }}>
+            🛒 공구마켓 <strong>{count(data?.marketsAll)}</strong> (진행 {count(data?.marketsActive)})
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -226,14 +287,19 @@ function ManagerList({ rows, loading, range }) {
 
 // ───── 메인 페이지 ─────
 const PERIODS = [
-  { key: 'thisYear', title: '📅 올해 누적', isFull: false },
-  { key: 'thisMonth', title: '📅 이번달', isFull: true }, // 셀러/브랜드 리스트도 가져옴
-  { key: 'nextMonth', title: '📅 다음달', isFull: false },
-  { key: 'thisWeek', title: '📅 이번주', isFull: false },
-  { key: 'nextWeek', title: '📅 다음주', isFull: false },
-  { key: 'lastMonth', title: '📅 저번달', isFull: false },
-  { key: 'sameMonthLastYear', title: '📅 전년 동월', isFull: false },
+  { key: 'thisYear', title: '올해 누적', isFull: false },
+  { key: 'thisQuarter', title: '이번 분기', isFull: false },
+  { key: 'thisMonth', title: '이번달', isFull: true }, // 셀러/브랜드 리스트도 가져옴
+  { key: 'nextMonth', title: '다음달', isFull: false },
+  { key: 'thisWeek', title: '이번주', isFull: false },
+  { key: 'nextWeek', title: '다음주', isFull: false },
+  { key: 'lastMonth', title: '저번달', isFull: false },
+  { key: 'sameMonthLastYear', title: '전년 동월', isFull: false },
 ];
+
+// 목표 매출 (단위: 원)
+const YEAR_TARGET = 20_000_000_000;     // 200억
+const QUARTER_TARGET = 5_000_000_000;   // 50억
 
 export default function QueryPage() {
   const { data: session, status } = useSession();
@@ -304,75 +370,85 @@ export default function QueryPage() {
       {/* ─── 기본 요약 ─── */}
       <h2 style={sectionH}>📌 매출 한눈에</h2>
 
-      {/* 올해 누적 (full width) */}
-      <div style={{ marginBottom: 12 }}>
-        <PeriodSummaryCard
-          title="📅 올해 누적"
+      {/* 1행: 올해 누적 / 이번 분기 (목표 매출 기준) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <PeriodCard
+          title="올해 누적"
           data={summaries.thisYear}
           loading={!summaries.thisYear}
           error={summaries.thisYear?.error}
           range={summaries.thisYear?.range}
-          color="#0891b2"
+          variant="reference"
+          target={YEAR_TARGET}
+        />
+        <PeriodCard
+          title="이번 분기"
+          data={summaries.thisQuarter}
+          loading={!summaries.thisQuarter}
+          error={summaries.thisQuarter?.error}
+          range={summaries.thisQuarter?.range}
+          variant="reference"
+          target={QUARTER_TARGET}
         />
       </div>
 
-      {/* 이번달 / 다음달 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <PeriodSummaryCard
-          title="📅 이번달"
+      {/* 2행: 이번달 / 다음달 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <PeriodCard
+          title="이번달"
           data={summaries.thisMonth}
           loading={!summaries.thisMonth}
           error={summaries.thisMonth?.error || summaries.thisMonth?.ordersError}
           range={summaries.thisMonth?.range}
-          color="#2563eb"
+          variant="now"
         />
-        <PeriodSummaryCard
-          title="📅 다음달"
+        <PeriodCard
+          title="다음달"
           data={summaries.nextMonth}
           loading={!summaries.nextMonth}
           error={summaries.nextMonth?.error}
           range={summaries.nextMonth?.range}
-          color="#7c3aed"
+          variant="future"
         />
       </div>
 
-      {/* 이번주 / 다음주 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <PeriodSummaryCard
-          title="📅 이번주"
+      {/* 3행: 이번주 / 다음주 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <PeriodCard
+          title="이번주"
           data={summaries.thisWeek}
           loading={!summaries.thisWeek}
           error={summaries.thisWeek?.error}
           range={summaries.thisWeek?.range}
-          color="#2563eb"
+          variant="now"
         />
-        <PeriodSummaryCard
-          title="📅 다음주"
+        <PeriodCard
+          title="다음주"
           data={summaries.nextWeek}
           loading={!summaries.nextWeek}
           error={summaries.nextWeek?.error}
           range={summaries.nextWeek?.range}
-          color="#7c3aed"
+          variant="future"
         />
       </div>
 
-      {/* 저번달 / 전년동월 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-        <PeriodSummaryCard
-          title="📅 저번달"
+      {/* 4행: 저번달 / 전년동월 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
+        <PeriodCard
+          title="저번달"
           data={summaries.lastMonth}
           loading={!summaries.lastMonth}
           error={summaries.lastMonth?.error}
           range={summaries.lastMonth?.range}
-          color="#6b7280"
+          variant="past"
         />
-        <PeriodSummaryCard
-          title="📅 전년 동월"
+        <PeriodCard
+          title="전년 동월"
           data={summaries.sameMonthLastYear}
           loading={!summaries.sameMonthLastYear}
           error={summaries.sameMonthLastYear?.error}
           range={summaries.sameMonthLastYear?.range}
-          color="#6b7280"
+          variant="past"
         />
       </div>
 

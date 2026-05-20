@@ -35,6 +35,15 @@ function resolve(period) {
     }
     case 'thisYear':
       return yearToDateRange(now.getFullYear());
+    case 'thisQuarter': {
+      const q = Math.floor(now.getMonth() / 3) + 1;
+      const startMonth = (q - 1) * 3 + 1;
+      const endMonth = startMonth + 2;
+      const start = new Date(now.getFullYear(), startMonth - 1, 1);
+      const end = new Date(now.getFullYear(), endMonth, 0);
+      const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return { startDate: fmt(start), endDate: fmt(end), label: `${now.getFullYear()}년 Q${q}` };
+    }
     case 'sameMonthLastYear':
       return monthToDateRange(now.getFullYear() - 1, now.getMonth() + 1);
     default:
