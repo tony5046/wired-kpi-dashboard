@@ -116,8 +116,11 @@ function ListCard({ title, emoji, rows, loading, columns, sortOptions, range }) 
     const arr = q
       ? rows.filter(r => {
           const hay = [
-            r.name,
+            r.name || '',
             r.manager || '',
+            r.managerName || '',
+            r.sellerName || '',
+            r.brandName || '',
             ...(r.brands || []),
             ...(r.sellers || []),
           ].join(' ').toLowerCase();
@@ -361,6 +364,44 @@ export default function QueryPage() {
           color="#6b7280"
         />
       </div>
+
+      {/* ─── 마켓 리스트 ─── */}
+      <h2 style={sectionH}>🛒 이번달 마켓</h2>
+      <ListCard
+        title="마켓 전체"
+        emoji=""
+        loading={!thisMonth || !thisMonth.marketsList}
+        rows={thisMonth?.marketsList}
+        range={thisMonth?.range}
+        sortOptions={[
+          { value: 'actualSales', label: '매출' },
+          { value: 'orderCount', label: '주문건수' },
+          { value: 'estimatedSales', label: '예상매출' },
+          { value: 'achievementRate', label: '달성률' },
+        ]}
+        columns={[
+          { key: 'name', label: '마켓명', align: 'left' },
+          { key: 'sellerName', label: '셀러', align: 'left' },
+          { key: 'brandName', label: '브랜드', align: 'left' },
+          { key: 'managerName', label: '담당자', align: 'left' },
+          { key: 'status', label: '상태', align: 'left', render: r => {
+            const map = { READY: '예정', ACTIVE: '진행중', ENDED: '종료', CANCELED: '취소' };
+            const colorMap = { READY: '#3b82f6', ACTIVE: '#10b981', ENDED: '#6b7280', CANCELED: '#ef4444' };
+            return <span style={{ color: colorMap[r.status] || '#6b7280', fontSize: 12, fontWeight: 500 }}>{map[r.status] || r.status}</span>;
+          }},
+          { key: 'actualSales', label: '매출', render: r => won(r.actualSales) },
+          { key: 'orderCount', label: '주문건수\n(중복제거)', render: r => count(r.orderCount) },
+          { key: 'estimatedSales', label: '예상매출', render: r => won(r.estimatedSales) },
+          { key: 'achievementRate', label: '달성률', render: r => {
+            const v = r.achievementRate;
+            if (v === null || v === undefined) return '-';
+            const color = v >= 100 ? '#10b981' : v >= 80 ? '#f59e0b' : '#ef4444';
+            return <span style={{ color, fontWeight: 600 }}>{pct(v)}</span>;
+          }},
+        ]}
+      />
+
+      <div style={{ height: 16 }} />
 
       {/* ─── 셀러 리스트 ─── */}
       <h2 style={sectionH}>🏪 이번달 셀러</h2>

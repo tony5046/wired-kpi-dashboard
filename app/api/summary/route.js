@@ -79,6 +79,7 @@ export async function GET(request) {
       response.sellers = combined.sellers || [];
       response.brands = combined.brands || [];
       response.bySellerManager = combined.bySellerManager || [];
+      response.marketsList = combined.marketsList || [];
     }
 
     return NextResponse.json(response);
