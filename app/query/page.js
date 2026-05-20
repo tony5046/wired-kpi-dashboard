@@ -101,10 +101,18 @@ function LoadingRow({ size = 16, color = '#2563eb', text = '데이터 가져오�
   );
 }
 
+function fmtRange(range) {
+  if (!range) return '';
+  return `${range.startDate} ~ ${range.endDate}`;
+}
+
 function QuickTotalCard({ label, data, loading, error }) {
   return (
     <div style={quickTotalCard}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{label} 매출</div>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{label} 매출</div>
+      <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 6 }}>
+        {data?.range ? fmtRange(data.range) : ' '}
+      </div>
       {loading ? (
         <LoadingRow size={14} text="로딩 중..." />
       ) : error ? (
@@ -126,7 +134,12 @@ function QuickTotalCard({ label, data, loading, error }) {
 function QuickTopList({ label, data, loading, error, onClickItem }) {
   return (
     <div style={quickTopCard}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{label}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+        {data?.range && (
+          <div style={{ fontSize: 10, color: '#9ca3af' }}>{fmtRange(data.range)}</div>
+        )}
+      </div>
       {loading ? (
         <div style={{ padding: '12px 0' }}>
           <LoadingRow size={14} text="순위 집계 중..." />
@@ -328,6 +341,18 @@ export default function QueryPage() {
           ⚠️ 와이어드민 토큰이 만료됐어요. 매출 데이터를 가져오지 못합니다. 새 토큰 발급 필요.
         </div>
       )}
+
+      {/* 데이터 기준 안내 */}
+      <div style={{
+        padding: '10px 14px', marginBottom: 16,
+        background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8,
+        fontSize: 12, color: '#1e40af',
+        display: 'flex', flexWrap: 'wrap', gap: 16,
+      }}>
+        <span><strong>📊 매출 기준:</strong> 와이어드민 총 결제금액 (배송비 포함)</span>
+        <span><strong>📅 기간 기준:</strong> 발송일 (출고 처리 완료일)</span>
+        <span><strong>🔄 갱신 주기:</strong> 매일 새벽 3시 자동 + 페이지 진입 시</span>
+      </div>
 
       {/* ━━ 1. 기본 요약 (자동) ━━ */}
       <section style={{ marginBottom: 24 }}>
