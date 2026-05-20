@@ -248,16 +248,130 @@ function OptionD() {
   );
 }
 
+// ─────────────── 옵션 E: B 스타일 + 현재 순서 유지 ───────────────
+function PeriodCard({ data, variant }) {
+  // variant: 'now' | 'future' | 'past' | 'reference'
+  const styles = {
+    now: {
+      bg: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+      color: '#fff', shadow: '0 4px 14px rgba(37,99,235,0.3)',
+      labelOp: 0.85, subOp: 0.75, badge: 'NOW', badgeBg: '#fff', badgeColor: '#2563eb',
+    },
+    future: {
+      bg: '#fff', color: '#111', shadow: '0 1px 3px rgba(0,0,0,0.06)',
+      border: '2px dashed #c084fc', labelOp: 1, subOp: 1,
+      badge: '예정', badgeBg: '#c084fc', badgeColor: '#fff',
+    },
+    past: {
+      bg: '#f9fafb', color: '#374151', shadow: 'none',
+      border: '1px solid #e5e7eb', labelOp: 1, subOp: 1,
+    },
+    reference: {
+      bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
+      color: '#fff', shadow: '0 4px 14px rgba(8,145,178,0.25)',
+      labelOp: 0.85, subOp: 0.75,
+    },
+  };
+  const s = styles[variant];
+  const pct = data.estimated > 0 ? (data.mixed / data.estimated) * 100 : 0;
+
+  return (
+    <div style={{
+      position: 'relative',
+      padding: 20, borderRadius: 14,
+      background: s.bg, color: s.color,
+      boxShadow: s.shadow,
+      border: s.border || 'none',
+      transition: 'transform 0.15s',
+    }}>
+      {s.badge && (
+        <div style={{
+          position: 'absolute', top: -10, right: 16,
+          background: s.badgeBg, color: s.badgeColor,
+          padding: '3px 12px', borderRadius: 14,
+          fontSize: 11, fontWeight: 700,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        }}>{s.badge}</div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+        <div style={{ fontSize: 15, fontWeight: 700 }}>📅 {data.label}</div>
+        <div style={{ fontSize: 11, opacity: s.subOp }}>{data.range}</div>
+      </div>
+
+      {/* 큰 숫자: 예상+실제 매출 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 12, opacity: s.labelOp, marginBottom: 4 }}>예상매출 + 실제매출</div>
+        <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{won(data.mixed)}</div>
+      </div>
+
+      {/* 예상매출 + 진행률 바 */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, opacity: s.labelOp }}>
+          <span>예상 매출 {won(data.estimated)}</span>
+          <span style={{ fontWeight: 600 }}>{pct.toFixed(0)}%</span>
+        </div>
+        <div style={{ height: 6, background: variant === 'now' || variant === 'reference' ? 'rgba(255,255,255,0.25)' : '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{
+            width: `${Math.min(pct, 100)}%`, height: '100%',
+            background: variant === 'now' || variant === 'reference' ? '#fff' : 'linear-gradient(90deg, #2563eb, #7c3aed)',
+            borderRadius: 3,
+          }} />
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, opacity: s.subOp, paddingTop: 10, borderTop: `1px solid ${variant === 'now' || variant === 'reference' ? 'rgba(255,255,255,0.2)' : '#e5e7eb'}` }}>
+        🛒 공구마켓 <strong>{data.marketsAll}건</strong> (진행 {data.marketsActive}건)
+      </div>
+    </div>
+  );
+}
+
+function OptionE() {
+  return (
+    <>
+      {/* 1행: 올해 누적 (full width, 청록) */}
+      <div style={{ marginBottom: 14 }}>
+        <PeriodCard data={SAMPLE.thisYear} variant="reference" />
+      </div>
+
+      {/* 2행: 이번달 / 다음달 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <PeriodCard data={SAMPLE.thisMonth} variant="now" />
+        <PeriodCard data={SAMPLE.nextMonth} variant="future" />
+      </div>
+
+      {/* 3행: 이번주 / 다음주 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <PeriodCard data={SAMPLE.thisWeek} variant="now" />
+        <PeriodCard data={SAMPLE.nextWeek} variant="future" />
+      </div>
+
+      {/* 4행: 저번달 / 전년동월 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <PeriodCard data={SAMPLE.lastMonth} variant="past" />
+        <PeriodCard data={SAMPLE.sameMonthLY} variant="past" />
+      </div>
+    </>
+  );
+}
+
 export default function Preview() {
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>🎨 디자인 옵션 미리보기</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          샘플 데이터로 그린 4가지 시안. 어느 게 가장 보기 편한지 골라주세요.
+          5가지 시안. 마음에 드는 거 골라주세요.
         </p>
         <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 현재 페이지로</Link>
       </header>
+
+      <div style={{ marginBottom: 48 }}>
+        <h2 style={sectionH}>⭐ 옵션 E · B 스타일 + 현재 순서 (NEW)</h2>
+        <p style={subText}>회원님이 원하시는 데이터/순서는 그대로, B의 시각 스타일만 입힘. NOW 배지로 현재 기간 강조, 예정은 점선 보더, 과거는 회색.</p>
+        <OptionE />
+      </div>
 
       <div style={{ marginBottom: 48 }}>
         <h2 style={sectionH}>옵션 A · 히어로 + 컴팩트 표</h2>
