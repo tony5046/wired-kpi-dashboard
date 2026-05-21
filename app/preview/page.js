@@ -462,10 +462,12 @@ function MarketsSection() {
             border: '1px solid #d1d5db', borderRadius: 6,
           }}
         />
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
           <SortBtn active={sortBy === 'sales'} onClick={() => setSortBy('sales')}>매출 ↓</SortBtn>
           <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문건수 ↓</SortBtn>
+          <SortBtn active={sortBy === 'estimatedSales'} onClick={() => setSortBy('estimatedSales')}>예상매출 ↓</SortBtn>
+          <SortBtn active={sortBy === 'achievementRate'} onClick={() => setSortBy('achievementRate')}>달성률 ↓</SortBtn>
         </div>
       </div>
 
@@ -587,17 +589,23 @@ function BrandsSection() {
         sales: 0,
         orderCount: 0,
         marketCount: 0,
+        estimatedSales: 0,
         markets: [],
         sellers: new Set(),
       };
       cur.sales += m.sales;
       cur.orderCount += m.orderCount;
+      cur.estimatedSales += m.estimatedSales;
       cur.marketCount += 1;
       cur.markets.push(m);
       cur.sellers.add(m.sellerName);
       map.set(key, cur);
     }
-    return [...map.values()].map(x => ({ ...x, sellers: [...x.sellers] }));
+    return [...map.values()].map(x => ({
+      ...x,
+      sellers: [...x.sellers],
+      achievementRate: x.estimatedSales > 0 ? (x.sales / x.estimatedSales) * 100 : 0,
+    }));
   }, []);
 
   // HOT 임계: 총 주문건수 상위 25%
@@ -639,11 +647,13 @@ function BrandsSection() {
             border: '1px solid #d1d5db', borderRadius: 6,
           }}
         />
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
           <SortBtn active={sortBy === 'sales'} onClick={() => setSortBy('sales')}>매출 ↓</SortBtn>
           <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문건수 ↓</SortBtn>
           <SortBtn active={sortBy === 'marketCount'} onClick={() => setSortBy('marketCount')}>공구건수 ↓</SortBtn>
+          <SortBtn active={sortBy === 'estimatedSales'} onClick={() => setSortBy('estimatedSales')}>예상매출 ↓</SortBtn>
+          <SortBtn active={sortBy === 'achievementRate'} onClick={() => setSortBy('achievementRate')}>달성률 ↓</SortBtn>
         </div>
       </div>
 
@@ -655,8 +665,8 @@ function BrandsSection() {
       {/* 브랜드 헤더 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '36px minmax(160px,1.5fr) 70px 80px 100px 95px 70px 30px',
-        gap: 12, padding: '8px 14px',
+        gridTemplateColumns: '36px minmax(140px,1.3fr) 65px 75px 95px 80px 65px 95px 65px 30px',
+        gap: 10, padding: '8px 14px',
         background: '#f9fafb', borderRadius: 6,
         fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 6,
       }}>
@@ -667,6 +677,8 @@ function BrandsSection() {
         <div style={{ textAlign: 'right' }}>매출</div>
         <div style={{ textAlign: 'right' }}>주문건수</div>
         <div style={{ textAlign: 'right' }}>공구건수</div>
+        <div style={{ textAlign: 'right' }}>예상매출</div>
+        <div style={{ textAlign: 'right' }}>달성률</div>
         <div></div>
       </div>
 
@@ -687,23 +699,23 @@ function BrandsSection() {
                 onClick={() => setExpanded(isOpen ? null : b.name)}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '36px minmax(160px,1.5fr) 70px 80px 100px 95px 70px 30px',
-                  gap: 12, padding: '12px 14px', cursor: 'pointer',
+                  gridTemplateColumns: '36px minmax(140px,1.3fr) 65px 75px 95px 80px 65px 95px 65px 30px',
+                  gap: 10, padding: '12px 14px', cursor: 'pointer',
                   background: isOpen ? '#eff6ff' : '#fff',
                   alignItems: 'center', fontSize: 13,
                 }}
               >
                 <div style={{ color: '#9ca3af' }}>#{i + 1}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600 }}>{b.name}</span>
                   {isHot && (
                     <span style={{
-                      fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                      fontSize: 10, padding: '2px 7px', borderRadius: 10,
                       background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
                       color: '#fff', fontWeight: 700,
                     }}>🔥 HOT</span>
                   )}
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>({b.sellers.length}개 셀러)</span>
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>({b.sellers.length})</span>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <span style={{
@@ -714,9 +726,14 @@ function BrandsSection() {
                   }}>{b.vendorType}</span>
                 </div>
                 <div style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{b.manager || '-'}</div>
-                <div style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(b.sales)}</div>
-                <div style={{ textAlign: 'right' }}>{b.orderCount.toLocaleString('ko-KR')}건</div>
-                <div style={{ textAlign: 'right', color: '#6b7280' }}>{b.marketCount}개</div>
+                <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 12 }}>{fmt(b.sales)}</div>
+                <div style={{ textAlign: 'right', fontSize: 12 }}>{b.orderCount.toLocaleString('ko-KR')}건</div>
+                <div style={{ textAlign: 'right', color: '#6b7280', fontSize: 12 }}>{b.marketCount}개</div>
+                <div style={{ textAlign: 'right', color: '#6b7280', fontSize: 12 }}>{fmt(b.estimatedSales)}</div>
+                <div style={{
+                  textAlign: 'right', fontWeight: 600, fontSize: 12,
+                  color: b.achievementRate >= 100 ? '#10b981' : b.achievementRate >= 80 ? '#f59e0b' : '#ef4444',
+                }}>{b.achievementRate.toFixed(0)}%</div>
                 <div style={{ textAlign: 'right', color: '#9ca3af' }}>{isOpen ? '▲' : '▼'}</div>
               </div>
 
