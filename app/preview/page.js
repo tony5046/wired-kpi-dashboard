@@ -788,15 +788,6 @@ export default function Preview() {
         <TrendChart />
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <ManagerContribution />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-        <RankList emoji="🏪" title="셀러 TOP 10" hint="올해 누적 · 전년 동기 대비" rows={SELLERS} />
-        <RankList emoji="🏷️" title="브랜드 TOP 10" hint="올해 누적 · 전년 동기 대비" rows={BRANDS} />
-      </div>
-
       {/* 마켓 현황 */}
       <div style={{ marginBottom: 24 }}>
         <MarketsSection />
