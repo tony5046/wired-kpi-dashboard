@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
+import ChatWidget from '../chat-widget';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -845,6 +846,9 @@ export default function Preview() {
       <div style={{ marginBottom: 24 }}>
         <BrandsSection />
       </div>
+
+      {/* 채팅 위젯 (플로팅) */}
+      <ChatWidget />
 
       <div style={{
         padding: 16, background: '#eff6ff', border: '1px solid #bfdbfe',
