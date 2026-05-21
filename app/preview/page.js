@@ -81,27 +81,59 @@ function pct(v) {
   return sign + v.toFixed(1) + '%';
 }
 
-// ─────────────── 목표 카드 ───────────────
-function TargetCard({ title, target, current, period }) {
+// ─────────────── 목표 카드 (날짜 진행률 vs 매출 달성률) ───────────────
+function TargetCard({ title, target, current, period, dateProgress }) {
   const ach = (current / target) * 100;
   const remaining = target - current;
+  const gap = ach - dateProgress; // +면 페이스 양호, -면 뒤처짐
+  const onPace = gap >= 0;
+
   return (
     <div style={{
       padding: 14, background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
       color: '#fff', borderRadius: 12,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
         <div style={{ fontSize: 12, opacity: 0.85 }}>{title}</div>
         <div style={{ fontSize: 11, opacity: 0.75 }}>{period}</div>
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 2 }}>{fmt(current)}</div>
-      <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 8 }}>목표 {fmt(target)}</div>
-      <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
-        <div style={{ width: `${Math.min(ach, 100)}%`, height: '100%', background: '#fff', borderRadius: 4 }} />
+      <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 10 }}>목표 {fmt(target)}</div>
+
+      {/* 매출 달성률 바 */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.85, marginBottom: 2 }}>
+          <span>💰 매출 달성률</span>
+          <span style={{ fontWeight: 700 }}>{ach.toFixed(1)}%</span>
+        </div>
+        <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(ach, 100)}%`, height: '100%', background: '#fff', borderRadius: 4 }} />
+        </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-        <span style={{ fontWeight: 700 }}>{ach.toFixed(1)}% 달성</span>
-        <span style={{ opacity: 0.85 }}>남은 {fmt(Math.max(0, remaining))}</span>
+
+      {/* 날짜 진행률 바 */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, opacity: 0.85, marginBottom: 2 }}>
+          <span>📅 날짜 진행률</span>
+          <span style={{ fontWeight: 700 }}>{dateProgress.toFixed(1)}%</span>
+        </div>
+        <div style={{ height: 8, background: 'rgba(255,255,255,0.18)', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(dateProgress, 100)}%`, height: '100%', background: 'rgba(255,255,255,0.6)', borderRadius: 4 }} />
+        </div>
+      </div>
+
+      {/* 페이스 배지 */}
+      <div style={{
+        padding: '6px 10px', borderRadius: 8,
+        background: onPace ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
+        border: '1px solid ' + (onPace ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.5)'),
+        fontSize: 11, fontWeight: 700, textAlign: 'center', marginBottom: 6,
+      }}>
+        {onPace ? '✅' : '⚠️'} 페이스 {onPace ? '양호' : '뒤처짐'} ({gap >= 0 ? '+' : ''}{gap.toFixed(1)}%p)
+      </div>
+
+      <div style={{ fontSize: 11, opacity: 0.85, textAlign: 'right' }}>
+        남은 {fmt(Math.max(0, remaining))}
       </div>
     </div>
   );
@@ -165,8 +197,20 @@ function TrendChart() {
 
         {/* 우측 사이드바 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <TargetCard title="🎯 연간 목표" target={YEAR_TARGET} current={YTD_2026} period="1~5월" />
-          <TargetCard title="🎯 분기 목표" target={QUARTER_TARGET} current={QTD_2026} period="Q2 4~5월" />
+          <TargetCard
+            title="🎯 연간 목표"
+            target={YEAR_TARGET}
+            current={YTD_2026}
+            period="1~5월"
+            dateProgress={38.4}  /* 2026-05-20 기준 (140일/365) */
+          />
+          <TargetCard
+            title="🎯 분기 목표"
+            target={QUARTER_TARGET}
+            current={QTD_2026}
+            period="Q2 4~5월"
+            dateProgress={54.9}  /* Q2 시작부터 5/20까지 50일/91 */
+          />
           <CompareCard label="vs 2025 동기간" current={YTD_2026} base={YTD_2025} />
           <CompareCard label="vs 2024 동기간" current={YTD_2026} base={YTD_2024} />
         </div>
