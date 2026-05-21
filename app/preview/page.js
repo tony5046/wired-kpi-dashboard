@@ -1,414 +1,289 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
+import { useState, useMemo } from 'react';
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell,
+  ReferenceLine, Label,
+} from 'recharts';
 
-// 샘플 데이터 (실제 수치 흉내)
-const SAMPLE = {
-  thisYear:      { label: '올해 누적',  range: '2026-01-01 ~ 2026-12-31', estimated: 8600, mixed: 6815, marketsAll: 479, marketsActive: 431 },
-  thisMonth:     { label: '이번달',     range: '2026-05-01 ~ 2026-05-31', estimated: 1629, mixed: 744,  marketsAll: 102, marketsActive: 89 },
-  nextMonth:     { label: '다음달',     range: '2026-06-01 ~ 2026-06-30', estimated: 1450, mixed: 0,    marketsAll: 78,  marketsActive: 78 },
-  thisWeek:      { label: '이번주',     range: '2026-05-18 ~ 2026-05-24', estimated: 525,  mixed: 157,  marketsAll: 33,  marketsActive: 31 },
-  nextWeek:      { label: '다음주',     range: '2026-05-25 ~ 2026-05-31', estimated: 380,  mixed: 0,    marketsAll: 22,  marketsActive: 22 },
-  lastMonth:     { label: '저번달',     range: '2026-04-01 ~ 2026-04-30', estimated: 1196, mixed: 1250, marketsAll: 92,  marketsActive: 83 },
-  sameMonthLY:   { label: '전년동월',   range: '2025-05-01 ~ 2025-05-31', estimated: 1332, mixed: 1679, marketsAll: 91,  marketsActive: 82 },
-};
+// ─────────────── 모의 데이터 ───────────────
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
-function won(n) {
-  if (n === 0 || !n) return '0백만원';
-  return n.toLocaleString('ko-KR') + '백만원';
+// 3년치 월 매출 (백만원 단위)
+const TREND = MONTHS.map((m, i) => ({
+  month: m,
+  '2024': 2067 + Math.round((Math.sin(i * 0.7) + 1) * 200) - i * 30,
+  '2025': 1535 + Math.round((Math.sin(i * 0.5 + 1) + 1) * 250) - i * 10,
+  '2026': i < 5 ? 1094 + Math.round((Math.cos(i * 0.6) + 1) * 250) + i * 50 : null,
+  // 다음달 예상 (6월만)
+  '2026 예상': i === 5 ? 1450 : null,
+}));
+
+// 누적 비교
+const YTD_2026 = TREND.slice(0, 5).reduce((s, r) => s + (r['2026'] || 0), 0);
+const YTD_2025 = TREND.slice(0, 5).reduce((s, r) => s + (r['2025'] || 0), 0);
+const YTD_2024 = TREND.slice(0, 5).reduce((s, r) => s + (r['2024'] || 0), 0);
+const YOY_PCT = ((YTD_2026 - YTD_2025) / YTD_2025) * 100;
+const YOY_2024_PCT = ((YTD_2026 - YTD_2024) / YTD_2024) * 100;
+
+// 담당자별 기여도
+const MANAGERS = [
+  { name: '김규민', sales: 3200, color: '#2563eb' },
+  { name: '정석호', sales: 2400, color: '#7c3aed' },
+  { name: '강규성', sales: 850,  color: '#0891b2' },
+  { name: '최예린', sales: 420,  color: '#10b981' },
+];
+const MANAGER_TOTAL = MANAGERS.reduce((s, m) => s + m.sales, 0);
+
+// 셀러 TOP 10
+const SELLERS = [
+  { name: '오인스',     sales: 1480, lastYear: 1320, manager: '김규민' },
+  { name: '달빛',       sales: 980,  lastYear: 720,  manager: '정석호' },
+  { name: '심플팩토리',  sales: 590,  lastYear: 650,  manager: '김규민' },
+  { name: '김영은마켓',  sales: 410,  lastYear: 380,  manager: '정석호' },
+  { name: '아임박선생',  sales: 320,  lastYear: 150,  manager: '강규성' },
+  { name: '바이미룸',    sales: 280,  lastYear: 0,    manager: '김규민' },
+  { name: '대랑맘',     sales: 220,  lastYear: 180,  manager: '강규성' },
+  { name: '미니결',     sales: 190,  lastYear: 200,  manager: '정석호' },
+  { name: '포유홈',     sales: 165,  lastYear: 140,  manager: '김규민' },
+  { name: '김별샘',     sales: 150,  lastYear: 110,  manager: '강규성' },
+];
+
+const BRANDS = [
+  { name: '동국제약',     sales: 720, lastYear: 600 },
+  { name: '오로바일렌',   sales: 510, lastYear: 0 },
+  { name: '퓨어레비',     sales: 490, lastYear: 350 },
+  { name: '드시모네',     sales: 430, lastYear: 380 },
+  { name: '허그베어',     sales: 320, lastYear: 240 },
+  { name: '테코야',       sales: 260, lastYear: 280 },
+  { name: '블랙홀 코팅큐', sales: 250, lastYear: 220 },
+  { name: '디귿',         sales: 200, lastYear: 0 },
+  { name: '트루티',       sales: 165, lastYear: 130 },
+  { name: '트루쿡',       sales: 150, lastYear: 110 },
+];
+
+// ─────────────── 유틸 ───────────────
+function fmt(v) { return v?.toLocaleString('ko-KR') + '백만원'; }
+function pct(v) {
+  if (v == null) return '-';
+  const sign = v > 0 ? '+' : '';
+  return sign + v.toFixed(1) + '%';
 }
 
-// ─────────────── 옵션 A: 히어로 + 컴팩트 ───────────────
-function OptionA() {
-  const t = SAMPLE.thisMonth;
-  const pct = t.estimated > 0 ? (t.mixed / t.estimated) * 100 : 0;
+// ─────────────── 컴포넌트 ───────────────
+function SectionTitle({ emoji, title, hint }) {
   return (
-    <>
-      {/* Hero */}
-      <div style={{
-        padding: 28, background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
-        color: '#fff', borderRadius: 16, marginBottom: 16, boxShadow: '0 4px 12px rgba(37,99,235,0.25)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 18 }}>📅 {t.label}</h3>
-          <span style={{ fontSize: 13, opacity: 0.85 }}>{t.range}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 32, alignItems: 'flex-end' }}>
-          <div>
-            <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>예상 매출</div>
-            <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1 }}>{won(t.estimated)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>예상매출 + 실제매출</div>
-            <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{won(t.mixed)}</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, opacity: 0.9 }}>
-            <span>진행률 (실제/예상)</span>
-            <span>{pct.toFixed(1)}%</span>
-          </div>
-          <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: '#fff', borderRadius: 4 }} />
-          </div>
-        </div>
-        <div style={{ marginTop: 14, fontSize: 13, opacity: 0.9 }}>
-          🛒 공구마켓 {t.marketsAll}건 (진행 {t.marketsActive}건)
-        </div>
-      </div>
-
-      {/* Compact table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#6b7280', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-          다른 기간 한눈에
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: '#f9fafb' }}>
-              <th style={th2}>기간</th>
-              <th style={{ ...th2, textAlign: 'right' }}>예상 매출</th>
-              <th style={{ ...th2, textAlign: 'right' }}>예상+실제</th>
-              <th style={{ ...th2, textAlign: 'right' }}>마켓 (총/진행)</th>
-              <th style={th2}>날짜</th>
-            </tr>
-          </thead>
-          <tbody>
-            {['thisYear', 'thisWeek', 'nextWeek', 'nextMonth', 'lastMonth', 'sameMonthLY'].map(k => {
-              const d = SAMPLE[k];
-              return (
-                <tr key={k}>
-                  <td style={{ ...td2, fontWeight: 500 }}>{d.label}</td>
-                  <td style={{ ...td2, textAlign: 'right' }}>{won(d.estimated)}</td>
-                  <td style={{ ...td2, textAlign: 'right', fontWeight: 600, color: '#2563eb' }}>{won(d.mixed)}</td>
-                  <td style={{ ...td2, textAlign: 'right' }}>{d.marketsAll}건 / {d.marketsActive}건</td>
-                  <td style={{ ...td2, fontSize: 11, color: '#9ca3af' }}>{d.range}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <div style={{ marginBottom: 12 }}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{emoji} {title}</h2>
+      {hint && <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>{hint}</p>}
+    </div>
   );
 }
 
-// ─────────────── 옵션 B: 타임라인 ───────────────
-function OptionB() {
-  const tl = [
-    { ...SAMPLE.lastMonth, color: '#94a3b8' },
-    { ...SAMPLE.thisWeek, color: '#6366f1' },
-    { ...SAMPLE.thisMonth, color: '#2563eb', highlight: true },
-    { ...SAMPLE.nextWeek, color: '#a78bfa' },
-    { ...SAMPLE.nextMonth, color: '#c084fc' },
-  ];
+function TrendChart() {
   return (
-    <>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
-        {tl.map((d, i) => (
-          <div key={i} style={{
-            flex: d.highlight ? 1.5 : 1,
-            padding: 16,
-            background: d.highlight ? `linear-gradient(135deg, ${d.color} 0%, #7c3aed 100%)` : '#fff',
-            color: d.highlight ? '#fff' : '#111',
-            border: `1px solid ${d.highlight ? d.color : '#e5e7eb'}`,
-            borderRadius: 12,
-            position: 'relative',
-          }}>
-            {d.highlight && <div style={{ position: 'absolute', top: -8, left: 12, background: '#fff', color: d.color, padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, border: `1px solid ${d.color}` }}>NOW</div>}
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{d.label}</div>
-            <div style={{ fontSize: 10, opacity: 0.7, marginBottom: 10 }}>{d.range}</div>
-            <div style={{ fontSize: d.highlight ? 22 : 16, fontWeight: 700, marginBottom: 4 }}>{won(d.mixed)}</div>
-            <div style={{ fontSize: 11, opacity: 0.8 }}>예상 {won(d.estimated)}</div>
-            <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>🛒 {d.marketsAll}건</div>
+    <div style={card}>
+      <SectionTitle emoji="📈" title="3년 월별 매출 추이" hint="2024 회색 / 2025 노랑 / 2026 파랑 · 다음달은 예상매출(점선)" />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
+        <div style={{ height: 360 }}>
+          <ResponsiveContainer>
+            <LineChart data={TREND}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="month" fontSize={12} />
+              <YAxis fontSize={11} tickFormatter={v => (v / 1000).toFixed(1) + 'B'} />
+              <Tooltip formatter={v => fmt(v)} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line type="monotone" dataKey="2024" stroke="#94a3b8" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="2025" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="2026" stroke="#2563eb" strokeWidth={3} dot={{ r: 5 }} />
+              <Line type="monotone" dataKey="2026 예상" stroke="#7c3aed" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* 우측: 누적 KPI */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: 14, background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)', color: '#fff', borderRadius: 12 }}>
+            <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>올해 누적 (1~5월)</div>
+            <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(YTD_2026)}</div>
+          </div>
+          <div style={{ padding: 14, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>vs 2025 동기간</div>
+            <div style={{ fontSize: 12, color: '#374151' }}>{fmt(YTD_2025)}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: YOY_PCT >= 0 ? '#10b981' : '#ef4444', marginTop: 4 }}>
+              {YOY_PCT >= 0 ? '▲' : '▼'} {pct(YOY_PCT)}
+            </div>
+          </div>
+          <div style={{ padding: 14, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>vs 2024 동기간</div>
+            <div style={{ fontSize: 12, color: '#374151' }}>{fmt(YTD_2024)}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: YOY_2024_PCT >= 0 ? '#10b981' : '#ef4444', marginTop: 4 }}>
+              {YOY_2024_PCT >= 0 ? '▲' : '▼'} {pct(YOY_2024_PCT)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManagerContribution() {
+  let cum = 0;
+  const rows = MANAGERS.map(m => {
+    const share = (m.sales / MANAGER_TOTAL) * 100;
+    cum += share;
+    return { ...m, share, cum };
+  });
+
+  return (
+    <div style={card}>
+      <SectionTitle emoji="👤" title="담당자별 기여도" hint="올해 누적 매출 기준" />
+
+      {/* 100% 누적 막대 */}
+      <div style={{ display: 'flex', height: 28, borderRadius: 6, overflow: 'hidden', marginBottom: 16 }}>
+        {rows.map(r => (
+          <div key={r.name} title={`${r.name} ${r.share.toFixed(1)}%`}
+            style={{
+              flex: r.share,
+              background: r.color,
+              color: '#fff', fontSize: 11, fontWeight: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+            {r.share >= 8 ? `${r.share.toFixed(0)}%` : ''}
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-        {['thisYear', 'sameMonthLY'].map(k => {
-          const d = SAMPLE[k];
+      {/* 리스트 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map(r => (
+          <div key={r.name} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '8px 12px', background: '#f9fafb', borderRadius: 8,
+          }}>
+            <div style={{ width: 10, height: 10, background: r.color, borderRadius: 2 }} />
+            <div style={{ flex: 1, fontWeight: 600 }}>{r.name}</div>
+            <div style={{ fontSize: 13, color: '#374151' }}>{fmt(r.sales)}</div>
+            <div style={{
+              fontSize: 13, fontWeight: 700, minWidth: 60, textAlign: 'right',
+              color: r.color,
+            }}>{r.share.toFixed(1)}%</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RankList({ title, emoji, hint, rows }) {
+  const total = rows.reduce((s, r) => s + r.sales, 0);
+  return (
+    <div style={card}>
+      <SectionTitle emoji={emoji} title={title} hint={hint} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {rows.map((r, i) => {
+          const share = (r.sales / total) * 100;
+          const yoy = r.lastYear > 0 ? ((r.sales - r.lastYear) / r.lastYear) * 100 : null;
+          const isNew = r.lastYear === 0;
           return (
-            <div key={k} style={{ padding: 16, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12 }}>
-              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>참고</div>
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{d.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb' }}>{won(d.mixed)}</div>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>예상 {won(d.estimated)} · 🛒 {d.marketsAll}건</div>
+            <div key={r.name} style={{
+              display: 'grid', gridTemplateColumns: '24px 1fr 100px 80px 70px',
+              gap: 12, alignItems: 'center', padding: '6px 4px',
+              borderBottom: i < rows.length - 1 ? '1px solid #f3f4f6' : 'none',
+            }}>
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>#{i + 1}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontWeight: 500, fontSize: 13 }}>{r.name}</div>
+                {r.manager && <div style={{ fontSize: 11, color: '#9ca3af' }}>({r.manager})</div>}
+              </div>
+              <div style={{ position: 'relative', height: 8, background: '#f3f4f6', borderRadius: 4 }}>
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, height: '100%',
+                  width: `${(r.sales / rows[0].sales) * 100}%`,
+                  background: i === 0 ? '#2563eb' : i < 3 ? '#3b82f6' : '#93c5fd',
+                  borderRadius: 4,
+                }} />
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, textAlign: 'right' }}>{fmt(r.sales)}</div>
+              <div style={{
+                fontSize: 11, fontWeight: 700, textAlign: 'right',
+                color: isNew ? '#3b82f6' : yoy >= 0 ? '#10b981' : '#ef4444',
+              }}>
+                {isNew ? '🆕 NEW' : (yoy >= 0 ? '▲' : '▼') + ' ' + Math.abs(yoy).toFixed(0) + '%'}
+              </div>
             </div>
           );
         })}
       </div>
-    </>
-  );
-}
-
-// ─────────────── 옵션 C: 막대 차트 ───────────────
-function OptionC() {
-  const data = [
-    { name: '전년동월', 예상: SAMPLE.sameMonthLY.estimated, 실제예상: SAMPLE.sameMonthLY.mixed },
-    { name: '저번달',   예상: SAMPLE.lastMonth.estimated,   실제예상: SAMPLE.lastMonth.mixed },
-    { name: '이번주',   예상: SAMPLE.thisWeek.estimated,    실제예상: SAMPLE.thisWeek.mixed },
-    { name: '이번달',   예상: SAMPLE.thisMonth.estimated,   실제예상: SAMPLE.thisMonth.mixed },
-    { name: '다음주',   예상: SAMPLE.nextWeek.estimated,    실제예상: SAMPLE.nextWeek.mixed },
-    { name: '다음달',   예상: SAMPLE.nextMonth.estimated,   실제예상: SAMPLE.nextMonth.mixed },
-    { name: '올해누적', 예상: SAMPLE.thisYear.estimated,    실제예상: SAMPLE.thisYear.mixed },
-  ];
-  return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 15 }}>기간별 매출 비교</h3>
-      <div style={{ width: '100%', height: 360 }}>
-        <ResponsiveContainer>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" fontSize={12} />
-            <YAxis fontSize={12} tickFormatter={v => v.toLocaleString() + 'M'} />
-            <Tooltip formatter={v => v.toLocaleString() + '백만원'} />
-            <Bar dataKey="예상" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="실제예상" fill="#2563eb" radius={[4, 4, 0, 0]}>
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.name === '이번달' ? '#ef4444' : '#2563eb'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>🟡 예상 매출 (마켓 등록값) · 🔵 예상+실제 매출 · 🔴 현재 기간 강조</p>
     </div>
   );
 }
 
-// ─────────────── 옵션 D: 탭 형식 ───────────────
-function OptionD() {
-  const tabs = ['이번달', '다음달', '이번주', '다음주', '저번달', '전년동월', '올해누적'];
-  const keys = ['thisMonth', 'nextMonth', 'thisWeek', 'nextWeek', 'lastMonth', 'sameMonthLY', 'thisYear'];
-  const [idx, setIdx] = useState(0);
-  const d = SAMPLE[keys[idx]];
-  const pct = d.estimated > 0 ? (d.mixed / d.estimated) * 100 : 0;
-  return (
-    <>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
-        {tabs.map((t, i) => (
-          <button key={i} onClick={() => setIdx(i)} style={{
-            padding: '10px 18px', fontSize: 14, fontWeight: idx === i ? 700 : 500,
-            background: idx === i ? '#2563eb' : '#fff',
-            color: idx === i ? '#fff' : '#374151',
-            border: '1px solid ' + (idx === i ? '#2563eb' : '#d1d5db'),
-            borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
-          }}>
-            {i === 0 && '⭐ '}{t}
-          </button>
-        ))}
-      </div>
-
-      <div style={{
-        padding: 32, background: '#fff',
-        border: '1px solid #e5e7eb', borderRadius: 16,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 24 }}>
-          <h2 style={{ margin: 0, fontSize: 24 }}>📅 {d.label}</h2>
-          <span style={{ fontSize: 13, color: '#9ca3af' }}>{d.range}</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
-          <div>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>💰 예상 매출</div>
-            <div style={{ fontSize: 38, fontWeight: 800, color: '#111' }}>{won(d.estimated)}</div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>마켓 등록값 합</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>💵 예상매출 + 실제매출</div>
-            <div style={{ fontSize: 38, fontWeight: 800, color: '#2563eb' }}>{won(d.mixed)}</div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>달성률 {pct.toFixed(1)}%</div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ height: 12, background: '#f3f4f6', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: 'linear-gradient(90deg, #2563eb, #7c3aed)', borderRadius: 6 }} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 16, padding: '16px 0', borderTop: '1px solid #f3f4f6' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>🛒 공구마켓 총</div>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{d.marketsAll}건</div>
-          </div>
-          <div style={{ flex: 1, borderLeft: '1px solid #f3f4f6', paddingLeft: 16 }}>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>🟢 진행중</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>{d.marketsActive}건</div>
-          </div>
-          <div style={{ flex: 1, borderLeft: '1px solid #f3f4f6', paddingLeft: 16 }}>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>❌ 취소</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{d.marketsAll - d.marketsActive}건</div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─────────────── 옵션 E: B 스타일 + 현재 순서 유지 ───────────────
-function PeriodCard({ data, variant }) {
-  // variant: 'now' | 'future' | 'past' | 'reference'
-  const styles = {
-    now: {
-      bg: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
-      color: '#fff', shadow: '0 4px 14px rgba(37,99,235,0.3)',
-      labelOp: 0.85, subOp: 0.75, badge: 'NOW', badgeBg: '#fff', badgeColor: '#2563eb',
-    },
-    future: {
-      bg: '#fff', color: '#111', shadow: '0 1px 3px rgba(0,0,0,0.06)',
-      border: '2px dashed #c084fc', labelOp: 1, subOp: 1,
-      badge: '예정', badgeBg: '#c084fc', badgeColor: '#fff',
-    },
-    past: {
-      bg: '#f9fafb', color: '#374151', shadow: 'none',
-      border: '1px solid #e5e7eb', labelOp: 1, subOp: 1,
-    },
-    reference: {
-      bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-      color: '#fff', shadow: '0 4px 14px rgba(8,145,178,0.25)',
-      labelOp: 0.85, subOp: 0.75,
-    },
-  };
-  const s = styles[variant];
-  const pct = data.estimated > 0 ? (data.mixed / data.estimated) * 100 : 0;
-
-  return (
-    <div style={{
-      position: 'relative',
-      padding: 20, borderRadius: 14,
-      background: s.bg, color: s.color,
-      boxShadow: s.shadow,
-      border: s.border || 'none',
-      transition: 'transform 0.15s',
-    }}>
-      {s.badge && (
-        <div style={{
-          position: 'absolute', top: -10, right: 16,
-          background: s.badgeBg, color: s.badgeColor,
-          padding: '3px 12px', borderRadius: 14,
-          fontSize: 11, fontWeight: 700,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        }}>{s.badge}</div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>📅 {data.label}</div>
-        <div style={{ fontSize: 11, opacity: s.subOp }}>{data.range}</div>
-      </div>
-
-      {/* 큰 숫자: 예상+실제 매출 */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, opacity: s.labelOp, marginBottom: 4 }}>예상매출 + 실제매출</div>
-        <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{won(data.mixed)}</div>
-      </div>
-
-      {/* 예상매출 + 진행률 바 */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, opacity: s.labelOp }}>
-          <span>예상 매출 {won(data.estimated)}</span>
-          <span style={{ fontWeight: 600 }}>{pct.toFixed(0)}%</span>
-        </div>
-        <div style={{ height: 6, background: variant === 'now' || variant === 'reference' ? 'rgba(255,255,255,0.25)' : '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{
-            width: `${Math.min(pct, 100)}%`, height: '100%',
-            background: variant === 'now' || variant === 'reference' ? '#fff' : 'linear-gradient(90deg, #2563eb, #7c3aed)',
-            borderRadius: 3,
-          }} />
-        </div>
-      </div>
-
-      <div style={{ fontSize: 12, opacity: s.subOp, paddingTop: 10, borderTop: `1px solid ${variant === 'now' || variant === 'reference' ? 'rgba(255,255,255,0.2)' : '#e5e7eb'}` }}>
-        🛒 공구마켓 <strong>{data.marketsAll}건</strong> (진행 {data.marketsActive}건)
-      </div>
-    </div>
-  );
-}
-
-function OptionE() {
-  return (
-    <>
-      {/* 1행: 올해 누적 (full width, 청록) */}
-      <div style={{ marginBottom: 14 }}>
-        <PeriodCard data={SAMPLE.thisYear} variant="reference" />
-      </div>
-
-      {/* 2행: 이번달 / 다음달 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <PeriodCard data={SAMPLE.thisMonth} variant="now" />
-        <PeriodCard data={SAMPLE.nextMonth} variant="future" />
-      </div>
-
-      {/* 3행: 이번주 / 다음주 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-        <PeriodCard data={SAMPLE.thisWeek} variant="now" />
-        <PeriodCard data={SAMPLE.nextWeek} variant="future" />
-      </div>
-
-      {/* 4행: 저번달 / 전년동월 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <PeriodCard data={SAMPLE.lastMonth} variant="past" />
-        <PeriodCard data={SAMPLE.sameMonthLY} variant="past" />
-      </div>
-    </>
-  );
-}
-
+// ─────────────── 메인 ───────────────
 export default function Preview() {
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, margin: 0 }}>🎨 디자인 옵션 미리보기</h1>
+        <h1 style={{ fontSize: 24, margin: 0 }}>🎨 새 디자인 초안 (가상 데이터)</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          5가지 시안. 마음에 드는 거 골라주세요.
+          ① 3년 매출 추이 ② 누적 기여도
         </p>
         <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 현재 페이지로</Link>
       </header>
 
-      <div style={{ marginBottom: 48 }}>
-        <h2 style={sectionH}>⭐ 옵션 E · B 스타일 + 현재 순서 (NEW)</h2>
-        <p style={subText}>회원님이 원하시는 데이터/순서는 그대로, B의 시각 스타일만 입힘. NOW 배지로 현재 기간 강조, 예정은 점선 보더, 과거는 회색.</p>
-        <OptionE />
+      {/* 1. 매출 흐름 */}
+      <div style={{ marginBottom: 24 }}>
+        <TrendChart />
       </div>
 
-      <div style={{ marginBottom: 48 }}>
-        <h2 style={sectionH}>옵션 A · 히어로 + 컴팩트 표</h2>
-        <p style={subText}>가장 중요한 "이번달"이 크고 눈에 띄게, 나머지는 표로 한눈에 비교.</p>
-        <OptionA />
+      {/* 2. 기여도 */}
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 12px' }}>🎯 올해 누적 기여도</h2>
+        <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 16px' }}>
+          올해 1~5월 누적 매출 기준 · 작년 동기간 대비 증감(▲/▼)도 표시
+        </p>
       </div>
 
-      <div style={{ marginBottom: 48 }}>
-        <h2 style={sectionH}>옵션 B · 타임라인 (시간순)</h2>
-        <p style={subText}>저번달 → 이번주 → 이번달(강조) → 다음주 → 다음달 흐름. 올해/전년은 따로.</p>
-        <OptionB />
+      <div style={{ marginBottom: 16 }}>
+        <ManagerContribution />
       </div>
 
-      <div style={{ marginBottom: 48 }}>
-        <h2 style={sectionH}>옵션 C · 막대 차트</h2>
-        <p style={subText}>모든 기간을 막대로 한 번에 비교. 시각적으로 즉시 파악.</p>
-        <OptionC />
-      </div>
-
-      <div style={{ marginBottom: 48 }}>
-        <h2 style={sectionH}>옵션 D · 탭 형식</h2>
-        <p style={subText}>탭 클릭으로 한 기간씩 시원하게. 큰 숫자 + 진행률 바.</p>
-        <OptionD />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+        <RankList
+          emoji="🏪"
+          title="셀러 TOP 10"
+          hint="올해 누적 · 우측은 전년 동기 대비"
+          rows={SELLERS}
+        />
+        <RankList
+          emoji="🏷️"
+          title="브랜드 TOP 10"
+          hint="올해 누적 · 우측은 전년 동기 대비"
+          rows={BRANDS}
+        />
       </div>
 
       <div style={{
-        padding: 20, background: '#eff6ff', border: '1px solid #bfdbfe',
-        borderRadius: 12, fontSize: 14,
+        padding: 16, background: '#eff6ff', border: '1px solid #bfdbfe',
+        borderRadius: 12, fontSize: 14, lineHeight: 1.6,
       }}>
-        💡 마음에 드는 거 알려주시면 그걸로 매출 조회기 메인을 바꿔드릴게요.
-        섞어도 OK (예: "A + C의 차트 추가").
+        💡 <strong>의견 주시면 다듬어드릴게요:</strong>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+          <li>위 라인 차트가 잘 보이는지, 색깔 구분 OK?</li>
+          <li>"올해 누적" 옆 vs 작년/2024 비교 카드 형태 적당한지</li>
+          <li>담당자 기여도 — 누적 막대 + 리스트 OK인지</li>
+          <li>셀러/브랜드 TOP — 그리드 막대 + 전년비 ▲▼ OK인지</li>
+          <li>빠진 데이터 / 추가하고 싶은 거 있는지</li>
+        </ul>
       </div>
     </main>
   );
 }
 
-const sectionH = { fontSize: 18, fontWeight: 700, margin: '0 0 4px' };
-const subText = { fontSize: 13, color: '#6b7280', margin: '0 0 16px' };
-const th2 = { padding: '10px 16px', fontSize: 12, color: '#6b7280', fontWeight: 500, textAlign: 'left', borderBottom: '1px solid #e5e7eb' };
-const td2 = { padding: '12px 16px', fontSize: 13, borderBottom: '1px solid #f3f4f6' };
+const card = {
+  padding: 20, background: '#fff',
+  border: '1px solid #e5e7eb', borderRadius: 14,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+};
