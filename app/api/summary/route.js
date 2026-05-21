@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getCombinedView } from '@/lib/cached';
+import { mockSummary } from '@/lib/mock-data';
 import {
   monthToDateRange, weekToDateRange, yearToDateRange,
   getIsoWeek,
@@ -65,6 +66,11 @@ export async function GET(request) {
   const period = searchParams.get('period') || 'thisMonth';
   const full = searchParams.get('full') === 'true';
   const range = resolve(period);
+
+  // 모의 데이터 모드 — USE_MOCK_DATA=true 일 때 와이어드민 호출 안 함
+  if (process.env.USE_MOCK_DATA === 'true') {
+    return NextResponse.json(mockSummary(period, range, full));
+  }
 
   try {
     const combined = await getCombinedView(range.startDate, range.endDate);
