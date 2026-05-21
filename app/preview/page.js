@@ -409,8 +409,7 @@ function MarketsSection() {
       const q = search.trim().toLowerCase();
       arr = arr.filter(m =>
         (m.sellerName || '').toLowerCase().includes(q) ||
-        (m.brandName || '').toLowerCase().includes(q) ||
-        (m.name || '').toLowerCase().includes(q)
+        (m.brandName || '').toLowerCase().includes(q)
       );
     }
     return [...arr].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
@@ -446,7 +445,7 @@ function MarketsSection() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="🔎 셀러명 / 브랜드명 / 마켓명 검색"
+          placeholder="🔎 셀러명 / 브랜드명 검색"
           value={search}
           onChange={e => onSearchChange(e.target.value)}
           style={{
@@ -474,7 +473,6 @@ function MarketsSection() {
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               <th style={{ ...th2, width: 40 }}>#</th>
-              <th style={{ ...th2, textAlign: 'left' }}>마켓명</th>
               <th style={{ ...th2, textAlign: 'left' }}>셀러</th>
               <th style={{ ...th2, textAlign: 'left' }}>브랜드</th>
               <th style={{ ...th2, textAlign: 'left' }}>담당자</th>
@@ -493,8 +491,7 @@ function MarketsSection() {
               return (
                 <tr key={m.id}>
                   <td style={{ ...td2, color: '#9ca3af' }}>{i + 1}</td>
-                  <td style={{ ...td2, fontWeight: 500 }}>{m.name}</td>
-                  <td style={td2}>{m.sellerName}</td>
+                  <td style={{ ...td2, fontWeight: 500 }}>{m.sellerName}</td>
                   <td style={td2}>{m.brandName}</td>
                   <td style={td2}>{m.managerName}</td>
                   <td style={{ ...td2 }}><span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span></td>
