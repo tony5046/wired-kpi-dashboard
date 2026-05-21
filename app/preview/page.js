@@ -30,21 +30,21 @@ const YOY_2024_PCT = ((YTD_2026 - YTD_2024) / YTD_2024) * 100;
 const YEAR_ACH = (YTD_2026 / YEAR_TARGET) * 100;
 const QUARTER_ACH = (QTD_2026 / QUARTER_TARGET) * 100;
 
-// 셀러 담당자 / 상품 담당자
+// 셀러 담당자 / 상품 담당자 (sales=백만원, marketCount=건수, sellerCount=함께한 셀러 수)
 const SELLER_MGRS = [
-  { name: '김규민', sales: 3200, lastYear: 2900 },
-  { name: '정석호', sales: 2400, lastYear: 2600 },
-  { name: '강규성', sales: 850,  lastYear: 700 },
-  { name: '최예린', sales: 420,  lastYear: 100 },
+  { name: '김규민', sales: 3200, lastYear: 2900, marketCount: 124, sellerCount: 18 },
+  { name: '정석호', sales: 2400, lastYear: 2600, marketCount: 95,  sellerCount: 14 },
+  { name: '강규성', sales: 850,  lastYear: 700,  marketCount: 42,  sellerCount: 7 },
+  { name: '최예린', sales: 420,  lastYear: 100,  marketCount: 18,  sellerCount: 3 },
 ];
 const PRODUCT_MGRS = [
-  { name: '정연수', sales: 2800, lastYear: 2500 },
-  { name: '김규민', sales: 1100, lastYear: 950 },
-  { name: '박준호', sales: 1050, lastYear: 800 },
-  { name: '이호영', sales: 720,  lastYear: 600 },
-  { name: '김소리', sales: 580,  lastYear: 520 },
-  { name: '정석호', sales: 420,  lastYear: 480 },
-  { name: '신나리', sales: 200,  lastYear: 0 },
+  { name: '정연수', sales: 2800, lastYear: 2500, marketCount: 95,  brandCount: 22 },
+  { name: '김규민', sales: 1100, lastYear: 950,  marketCount: 38,  brandCount: 8 },
+  { name: '박준호', sales: 1050, lastYear: 800,  marketCount: 35,  brandCount: 9 },
+  { name: '이호영', sales: 720,  lastYear: 600,  marketCount: 28,  brandCount: 6 },
+  { name: '김소리', sales: 580,  lastYear: 520,  marketCount: 22,  brandCount: 5 },
+  { name: '정석호', sales: 420,  lastYear: 480,  marketCount: 16,  brandCount: 4 },
+  { name: '신나리', sales: 200,  lastYear: 0,    marketCount: 8,   brandCount: 2 },
 ];
 
 const SELLERS = [
@@ -220,23 +220,27 @@ function TrendChart() {
 }
 
 // ─────────────── 담당자 기여도 (셀러+상품 나란히) ───────────────
-function ManagerColumn({ title, hint, rows, accent }) {
+function ManagerColumn({ title, hint, rows, accent, partnerLabel }) {
+  // partnerLabel: '셀러' | '브랜드' (옆에 함께한 거래 대상 수 표시용)
   const total = rows.reduce((s, r) => s + r.sales, 0);
   const sorted = [...rows].sort((a, b) => b.sales - a.sales);
   return (
     <div style={{ ...card, flex: 1 }}>
       <SectionTitle emoji="" title={title} hint={hint} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {sorted.map((r, i) => {
           const share = (r.sales / total) * 100;
           const isTop = (i === 0);
           const yoy = r.lastYear > 0 ? ((r.sales - r.lastYear) / r.lastYear) * 100 : null;
           const isNew = r.lastYear === 0;
+          const partnerCount = r.sellerCount ?? r.brandCount ?? 0;
+          const avgPerMarket = r.marketCount > 0 ? r.sales / r.marketCount : 0;
           return (
-            <div key={r.name}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <div key={r.name} style={{ paddingBottom: 10, borderBottom: i < sorted.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+              {/* 상단: 이름 + YoY + 비중 + 매출 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: isTop ? 700 : 500 }}>{r.name}</span>
+                  <span style={{ fontSize: 13, fontWeight: isTop ? 700 : 500 }}>{r.name}</span>
                   {isNew ? (
                     <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: '#dbeafe', color: '#1d4ed8' }}>🆕</span>
                   ) : yoy != null ? (
@@ -246,17 +250,26 @@ function ManagerColumn({ title, hint, rows, accent }) {
                   ) : null}
                 </div>
                 <div style={{ fontSize: 11, color: '#6b7280' }}>
-                  <span style={{ fontWeight: 600, color: '#374151' }}>{share.toFixed(1)}%</span>
-                  {' · '}{fmt(r.sales)}
+                  <span style={{ fontWeight: 700, color: accent }}>{share.toFixed(1)}%</span>
+                  {' · '}<span style={{ fontWeight: 600, color: '#374151' }}>{fmt(r.sales)}</span>
                 </div>
               </div>
-              <div style={{ height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+
+              {/* 막대 */}
+              <div style={{ height: 6, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
                 <div style={{
                   width: `${(r.sales / sorted[0].sales) * 100}%`,
                   height: '100%',
                   background: isTop ? accent : `${accent}aa`,
                   borderRadius: 3,
                 }} />
+              </div>
+
+              {/* 활성 지표 */}
+              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#6b7280' }}>
+                <span>🛒 마켓 <strong style={{ color: '#374151' }}>{r.marketCount}건</strong></span>
+                <span>{partnerLabel === '셀러' ? '🏪' : '🏷️'} {partnerLabel} <strong style={{ color: '#374151' }}>{partnerCount}곳</strong></span>
+                <span>📊 평균 <strong style={{ color: '#374151' }}>{avgPerMarket.toFixed(0)}백만/건</strong></span>
               </div>
             </div>
           );
@@ -278,15 +291,17 @@ function ManagerContribution() {
       <div style={{ display: 'flex', gap: 16 }}>
         <ManagerColumn
           title="🤝 셀러 담당자"
-          hint="셀러 발굴/관리 담당"
+          hint="셀러 발굴/관리 · 매출 + 활성 마켓 + 함께한 셀러 수"
           rows={SELLER_MGRS}
           accent="#2563eb"
+          partnerLabel="셀러"
         />
         <ManagerColumn
           title="📦 상품 담당자"
-          hint="상품 소싱/매칭 담당"
+          hint="상품 소싱/매칭 · 매출 + 활성 마켓 + 함께한 브랜드 수"
           rows={PRODUCT_MGRS}
           accent="#7c3aed"
+          partnerLabel="브랜드"
         />
       </div>
     </div>
