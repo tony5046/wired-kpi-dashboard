@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -72,6 +72,51 @@ const BRANDS = [
   { name: '트루티', sales: 165, lastYear: 130 },
   { name: '트루쿡', sales: 150, lastYear: 110 },
 ];
+
+// ─── 100건 마켓 모의 데이터 ───
+const MGR_OF_SELLER = {
+  '오인스': '김규민', '달빛': '정석호', '심플팩토리': '김규민', '김영은마켓': '정석호',
+  '아임박선생': '강규성', '바이미룸': '김규민', '대랑맘': '강규성', '미니결': '정석호',
+  '포유홈': '김규민', '김별샘': '강규성', '나풀나풀': '정석호', '그집1303': '김규민',
+  '깎언니': '강규성', '런던하이': '정석호', '히히스카이라운지': '김규민', '코앤텍': '최예린',
+  '빅토리사': '최예린', '선선부부하우스': '강규성', '매주가족': '정석호', '앙젤리크': '김규민',
+};
+const SELLER_NAMES = Object.keys(MGR_OF_SELLER);
+const BRAND_NAMES = ['동국제약','오로바일렌','퓨어레비','드시모네','허그베어','테코야','블랙홀 코팅큐','디귿','트루티','트루쿡','씨밀렉스','신일','코닥','VDL','로라애슐리','메디힐','풀무원','나무엑스','경자국밥','콤비타'];
+
+function genMarkets() {
+  const list = [];
+  for (let i = 0; i < 100; i++) {
+    const seller = SELLER_NAMES[i % SELLER_NAMES.length];
+    const brand = BRAND_NAMES[(i * 3) % BRAND_NAMES.length];
+    const seed1 = ((i * 9301 + 49297) % 233280) / 233280;
+    const seed2 = ((i * 7919 + 91) % 233280) / 233280;
+    // 매출 5~250 백만원 분포 (편향: 큰 매출 적고 작은 매출 많이)
+    const sales = Math.round(Math.pow(seed1, 2) * 250 + 3);
+    const orderCount = Math.max(5, Math.round(sales * (3 + seed2 * 4)));
+    const estimatedSales = Math.round(sales * (0.7 + seed2 * 0.7));
+    const statuses = ['ENDED','ENDED','ENDED','ACTIVE','READY'];
+    const status = statuses[i % statuses.length];
+    const day = (i % 28) + 1;
+    list.push({
+      id: 10000 + i,
+      name: `${brand}_${seller}_2026-05-${String(day).padStart(2,'0')}`,
+      sellerName: seller,
+      managerName: MGR_OF_SELLER[seller],
+      brandName: brand,
+      sales,
+      orderCount,
+      estimatedSales,
+      achievementRate: estimatedSales > 0 ? (sales / estimatedSales) * 100 : null,
+      status,
+      startedAt: `2026-05-${String(day).padStart(2,'0')}`,
+      endedAt: `2026-05-${String(Math.min(day + 2, 31)).padStart(2,'0')}`,
+    });
+  }
+  return list;
+}
+const MARKETS = genMarkets();
+const MANAGER_LIST = ['김규민', '정석호', '강규성', '최예린'];
 
 // ─────────────── 유틸 ───────────────
 function fmt(v) { return v?.toLocaleString('ko-KR') + '백만원'; }
@@ -350,6 +395,172 @@ function RankList({ title, emoji, hint, rows }) {
   );
 }
 
+// ─────────────── 마켓 현황 (탭 + 검색 + 정렬 + 페이징) ───────────────
+function MarketsSection() {
+  const [tab, setTab] = useState('all'); // 'all' | manager name
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('sales'); // 'sales' | 'orderCount'
+  const [showCount, setShowCount] = useState(50);
+
+  const filtered = useMemo(() => {
+    let arr = MARKETS;
+    if (tab !== 'all') arr = arr.filter(m => m.managerName === tab);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      arr = arr.filter(m =>
+        (m.sellerName || '').toLowerCase().includes(q) ||
+        (m.brandName || '').toLowerCase().includes(q) ||
+        (m.name || '').toLowerCase().includes(q)
+      );
+    }
+    return [...arr].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+  }, [tab, search, sortBy]);
+
+  const visible = filtered.slice(0, showCount);
+  const hasMore = filtered.length > showCount;
+
+  // 탭 변경/검색 변경 시 페이징 초기화
+  function switchTab(t) { setTab(t); setShowCount(50); }
+  function onSearchChange(v) { setSearch(v); setShowCount(50); }
+
+  return (
+    <div style={card}>
+      <SectionTitle emoji="🛒" title="이번달 마켓 현황" hint="셀러 담당자별 탭 · 검색 · 매출/주문 기준 정렬 · 50개씩 페이징" />
+
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+        <TabBtn active={tab === 'all'} onClick={() => switchTab('all')}>
+          전체 ({MARKETS.length})
+        </TabBtn>
+        {MANAGER_LIST.map(m => {
+          const c = MARKETS.filter(x => x.managerName === m).length;
+          return (
+            <TabBtn key={m} active={tab === m} onClick={() => switchTab(m)}>
+              {m} ({c})
+            </TabBtn>
+          );
+        })}
+      </div>
+
+      {/* 검색 + 정렬 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="🔎 셀러명 / 브랜드명 / 마켓명 검색"
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          style={{
+            padding: '8px 12px', fontSize: 13, flex: 1, minWidth: 220,
+            border: '1px solid #d1d5db', borderRadius: 6,
+          }}
+        />
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
+          <SortBtn active={sortBy === 'sales'} onClick={() => setSortBy('sales')}>매출 ↓</SortBtn>
+          <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문건수 ↓</SortBtn>
+        </div>
+      </div>
+
+      {/* 결과 정보 */}
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+        총 <strong style={{ color: '#374151' }}>{filtered.length}개</strong> 중 <strong style={{ color: '#374151' }}>{visible.length}개</strong> 표시
+        {tab !== 'all' && <> · 담당자 <strong style={{ color: '#2563eb' }}>{tab}</strong></>}
+        {search && <> · 검색 "<strong>{search}</strong>"</>}
+      </div>
+
+      {/* 테이블 */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f9fafb' }}>
+              <th style={{ ...th2, width: 40 }}>#</th>
+              <th style={{ ...th2, textAlign: 'left' }}>마켓명</th>
+              <th style={{ ...th2, textAlign: 'left' }}>셀러</th>
+              <th style={{ ...th2, textAlign: 'left' }}>브랜드</th>
+              <th style={{ ...th2, textAlign: 'left' }}>담당자</th>
+              <th style={{ ...th2 }}>상태</th>
+              <th style={{ ...th2, textAlign: 'right' }}>매출</th>
+              <th style={{ ...th2, textAlign: 'right' }}>주문건수</th>
+              <th style={{ ...th2, textAlign: 'right' }}>예상매출</th>
+              <th style={{ ...th2, textAlign: 'right' }}>달성률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((m, i) => {
+              const stColor = { ENDED: '#6b7280', ACTIVE: '#10b981', READY: '#3b82f6', CANCELED: '#ef4444' }[m.status] || '#6b7280';
+              const stLabel = { ENDED: '종료', ACTIVE: '진행중', READY: '예정', CANCELED: '취소' }[m.status] || m.status;
+              const achColor = m.achievementRate == null ? '#9ca3af' : m.achievementRate >= 100 ? '#10b981' : m.achievementRate >= 80 ? '#f59e0b' : '#ef4444';
+              return (
+                <tr key={m.id}>
+                  <td style={{ ...td2, color: '#9ca3af' }}>{i + 1}</td>
+                  <td style={{ ...td2, fontWeight: 500 }}>{m.name}</td>
+                  <td style={td2}>{m.sellerName}</td>
+                  <td style={td2}>{m.brandName}</td>
+                  <td style={td2}>{m.managerName}</td>
+                  <td style={{ ...td2 }}><span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span></td>
+                  <td style={{ ...td2, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
+                  <td style={{ ...td2, textAlign: 'right' }}>{m.orderCount.toLocaleString('ko-KR')}건</td>
+                  <td style={{ ...td2, textAlign: 'right', color: '#6b7280' }}>{fmt(m.estimatedSales)}</td>
+                  <td style={{ ...td2, textAlign: 'right', color: achColor, fontWeight: 600 }}>{m.achievementRate?.toFixed(0)}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {visible.length === 0 && (
+        <div style={{ padding: 30, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+          조건에 맞는 마켓 없음
+        </div>
+      )}
+
+      {/* 더보기 */}
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <button
+            onClick={() => setShowCount(c => c + 50)}
+            style={{
+              padding: '10px 28px', fontSize: 13, fontWeight: 600,
+              background: '#fff', color: '#2563eb',
+              border: '1px solid #2563eb', borderRadius: 8, cursor: 'pointer',
+            }}
+          >
+            ▼ 50개 더보기 (남은 {filtered.length - showCount}개)
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '8px 14px', fontSize: 13, fontWeight: active ? 700 : 500,
+      background: active ? '#2563eb' : '#fff',
+      color: active ? '#fff' : '#374151',
+      border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
+      borderRadius: 8, cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
+function SortBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '6px 10px', fontSize: 12, fontWeight: active ? 700 : 500,
+      background: active ? '#2563eb' : '#fff',
+      color: active ? '#fff' : '#374151',
+      border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
+      borderRadius: 5, cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
+const th2 = { padding: '10px 8px', borderBottom: '2px solid #e5e7eb', textAlign: 'right', fontSize: 11, color: '#6b7280', fontWeight: 500 };
+const td2 = { padding: '8px', borderBottom: '1px solid #f3f4f6', fontSize: 12 };
+
 // ─────────────── 메인 ───────────────
 export default function Preview() {
   return (
@@ -373,6 +584,11 @@ export default function Preview() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <RankList emoji="🏪" title="셀러 TOP 10" hint="올해 누적 · 전년 동기 대비" rows={SELLERS} />
         <RankList emoji="🏷️" title="브랜드 TOP 10" hint="올해 누적 · 전년 동기 대비" rows={BRANDS} />
+      </div>
+
+      {/* 마켓 현황 */}
+      <div style={{ marginBottom: 24 }}>
+        <MarketsSection />
       </div>
 
       <div style={{
