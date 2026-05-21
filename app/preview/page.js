@@ -84,6 +84,15 @@ const MGR_OF_SELLER = {
 const SELLER_NAMES = Object.keys(MGR_OF_SELLER);
 const BRAND_NAMES = ['동국제약','오로바일렌','퓨어레비','드시모네','허그베어','테코야','블랙홀 코팅큐','디귿','트루티','트루쿡','씨밀렉스','신일','코닥','VDL','로라애슐리','메디힐','풀무원','나무엑스','경자국밥','콤비타'];
 
+// 브랜드 메타 (담당자 + 거래형태)
+const PRODUCT_MGR_NAMES = ['정연수', '김규민', '박준호', '이호영', '김소리'];
+const BRAND_INFO = Object.fromEntries(
+  BRAND_NAMES.map((b, i) => [b, {
+    manager: PRODUCT_MGR_NAMES[i % PRODUCT_MGR_NAMES.length],
+    vendorType: (i % 3 === 0) ? '본사' : '밴더사', // 약 1/3은 본사
+  }])
+);
+
 function genMarkets() {
   const list = [];
   for (let i = 0; i < 100; i++) {
@@ -570,8 +579,11 @@ function BrandsSection() {
     for (const m of MARKETS) {
       const key = m.brandName;
       if (!key) continue;
+      const info = BRAND_INFO[key] || {};
       const cur = map.get(key) || {
         name: key,
+        manager: info.manager || '',
+        vendorType: info.vendorType || '',
         sales: 0,
         orderCount: 0,
         marketCount: 0,
@@ -599,7 +611,10 @@ function BrandsSection() {
     let arr = aggregated;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      arr = arr.filter(b => b.name.toLowerCase().includes(q));
+      arr = arr.filter(b =>
+        b.name.toLowerCase().includes(q) ||
+        (b.manager || '').toLowerCase().includes(q)
+      );
     }
     return [...arr].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
   }, [aggregated, search, sortBy]);
@@ -616,7 +631,7 @@ function BrandsSection() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="🔎 브랜드명 검색"
+          placeholder="🔎 브랜드명 / 담당자 검색"
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{
@@ -637,11 +652,30 @@ function BrandsSection() {
         {search && <> · 검색 "<strong>{search}</strong>"</>}
       </div>
 
+      {/* 브랜드 헤더 */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '36px minmax(160px,1.5fr) 70px 80px 100px 95px 70px 30px',
+        gap: 12, padding: '8px 14px',
+        background: '#f9fafb', borderRadius: 6,
+        fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 6,
+      }}>
+        <div>#</div>
+        <div>브랜드 / 셀러수</div>
+        <div style={{ textAlign: 'center' }}>거래형태</div>
+        <div>담당자</div>
+        <div style={{ textAlign: 'right' }}>매출</div>
+        <div style={{ textAlign: 'right' }}>주문건수</div>
+        <div style={{ textAlign: 'right' }}>공구건수</div>
+        <div></div>
+      </div>
+
       {/* 브랜드 리스트 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {filtered.map((b, i) => {
           const isHot = b.orderCount >= hotThreshold;
           const isOpen = expanded === b.name;
+          const isVendor = b.vendorType === '밴더사';
           return (
             <div key={b.name} style={{
               border: '1px solid ' + (isOpen ? '#2563eb' : '#e5e7eb'),
@@ -652,14 +686,15 @@ function BrandsSection() {
               <div
                 onClick={() => setExpanded(isOpen ? null : b.name)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px 30px',
+                  display: 'grid',
+                  gridTemplateColumns: '36px minmax(160px,1.5fr) 70px 80px 100px 95px 70px 30px',
                   gap: 12, padding: '12px 14px', cursor: 'pointer',
                   background: isOpen ? '#eff6ff' : '#fff',
                   alignItems: 'center', fontSize: 13,
                 }}
               >
                 <div style={{ color: '#9ca3af' }}>#{i + 1}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600 }}>{b.name}</span>
                   {isHot && (
                     <span style={{
@@ -670,6 +705,15 @@ function BrandsSection() {
                   )}
                   <span style={{ fontSize: 11, color: '#9ca3af' }}>({b.sellers.length}개 셀러)</span>
                 </div>
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{
+                    fontSize: 11, padding: '3px 8px', borderRadius: 10, fontWeight: 600,
+                    background: isVendor ? '#fef3c7' : '#dbeafe',
+                    color: isVendor ? '#92400e' : '#1e40af',
+                    border: '1px solid ' + (isVendor ? '#fcd34d' : '#93c5fd'),
+                  }}>{b.vendorType}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{b.manager || '-'}</div>
                 <div style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(b.sales)}</div>
                 <div style={{ textAlign: 'right' }}>{b.orderCount.toLocaleString('ko-KR')}건</div>
                 <div style={{ textAlign: 'right', color: '#6b7280' }}>{b.marketCount}개</div>
