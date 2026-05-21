@@ -558,6 +558,176 @@ function SortBtn({ active, onClick, children }) {
 const th2 = { padding: '10px 8px', borderBottom: '2px solid #e5e7eb', textAlign: 'right', fontSize: 11, color: '#6b7280', fontWeight: 500 };
 const td2 = { padding: '8px', borderBottom: '1px solid #f3f4f6', fontSize: 12 };
 
+// ─────────────── 브랜드별 현황 (그룹 + 펼침 + HOT 배지) ───────────────
+function BrandsSection() {
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('sales'); // 'sales' | 'orderCount' | 'marketCount'
+  const [expanded, setExpanded] = useState(null); // brand name
+
+  // 브랜드별 집계
+  const aggregated = useMemo(() => {
+    const map = new Map();
+    for (const m of MARKETS) {
+      const key = m.brandName;
+      if (!key) continue;
+      const cur = map.get(key) || {
+        name: key,
+        sales: 0,
+        orderCount: 0,
+        marketCount: 0,
+        markets: [],
+        sellers: new Set(),
+      };
+      cur.sales += m.sales;
+      cur.orderCount += m.orderCount;
+      cur.marketCount += 1;
+      cur.markets.push(m);
+      cur.sellers.add(m.sellerName);
+      map.set(key, cur);
+    }
+    return [...map.values()].map(x => ({ ...x, sellers: [...x.sellers] }));
+  }, []);
+
+  // HOT 임계: 총 주문건수 상위 25%
+  const hotThreshold = useMemo(() => {
+    const sorted = [...aggregated].map(b => b.orderCount).sort((a, b) => b - a);
+    const cutoff = Math.max(1, Math.floor(sorted.length * 0.25));
+    return sorted[cutoff - 1] || 0;
+  }, [aggregated]);
+
+  const filtered = useMemo(() => {
+    let arr = aggregated;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      arr = arr.filter(b => b.name.toLowerCase().includes(q));
+    }
+    return [...arr].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+  }, [aggregated, search, sortBy]);
+
+  return (
+    <div style={card}>
+      <SectionTitle
+        emoji="🏷️"
+        title="브랜드별 현황"
+        hint="브랜드 클릭 → 마켓 리스트 펼침 · 🔥 HOT = 주문건수 상위 25%"
+      />
+
+      {/* 검색 + 정렬 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="🔎 브랜드명 검색"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            padding: '8px 12px', fontSize: 13, flex: 1, minWidth: 220,
+            border: '1px solid #d1d5db', borderRadius: 6,
+          }}
+        />
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
+          <SortBtn active={sortBy === 'sales'} onClick={() => setSortBy('sales')}>매출 ↓</SortBtn>
+          <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문건수 ↓</SortBtn>
+          <SortBtn active={sortBy === 'marketCount'} onClick={() => setSortBy('marketCount')}>공구건수 ↓</SortBtn>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+        총 <strong style={{ color: '#374151' }}>{filtered.length}개 브랜드</strong>
+        {search && <> · 검색 "<strong>{search}</strong>"</>}
+      </div>
+
+      {/* 브랜드 리스트 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {filtered.map((b, i) => {
+          const isHot = b.orderCount >= hotThreshold;
+          const isOpen = expanded === b.name;
+          return (
+            <div key={b.name} style={{
+              border: '1px solid ' + (isOpen ? '#2563eb' : '#e5e7eb'),
+              borderRadius: 8, overflow: 'hidden',
+              transition: 'all 0.15s',
+            }}>
+              {/* 브랜드 행 */}
+              <div
+                onClick={() => setExpanded(isOpen ? null : b.name)}
+                style={{
+                  display: 'grid', gridTemplateColumns: '40px 1fr 100px 100px 80px 30px',
+                  gap: 12, padding: '12px 14px', cursor: 'pointer',
+                  background: isOpen ? '#eff6ff' : '#fff',
+                  alignItems: 'center', fontSize: 13,
+                }}
+              >
+                <div style={{ color: '#9ca3af' }}>#{i + 1}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 600 }}>{b.name}</span>
+                  {isHot && (
+                    <span style={{
+                      fontSize: 10, padding: '2px 8px', borderRadius: 10,
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+                      color: '#fff', fontWeight: 700,
+                    }}>🔥 HOT</span>
+                  )}
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>({b.sellers.length}개 셀러)</span>
+                </div>
+                <div style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(b.sales)}</div>
+                <div style={{ textAlign: 'right' }}>{b.orderCount.toLocaleString('ko-KR')}건</div>
+                <div style={{ textAlign: 'right', color: '#6b7280' }}>{b.marketCount}개</div>
+                <div style={{ textAlign: 'right', color: '#9ca3af' }}>{isOpen ? '▲' : '▼'}</div>
+              </div>
+
+              {/* 펼쳐진 마켓 리스트 */}
+              {isOpen && (
+                <div style={{ padding: 12, background: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                    <strong>{b.name}</strong>의 마켓 {b.markets.length}개
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, background: '#fff', borderRadius: 6, overflow: 'hidden' }}>
+                    <thead>
+                      <tr style={{ background: '#f3f4f6' }}>
+                        <th style={th3}>셀러</th>
+                        <th style={th3}>담당자</th>
+                        <th style={{ ...th3, textAlign: 'center' }}>상태</th>
+                        <th style={{ ...th3, textAlign: 'right' }}>매출</th>
+                        <th style={{ ...th3, textAlign: 'right' }}>주문건수</th>
+                        <th style={{ ...th3, textAlign: 'right' }}>달성률</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {b.markets
+                        .sort((a, c) => c.sales - a.sales)
+                        .map(m => {
+                          const stColor = { ENDED: '#6b7280', ACTIVE: '#10b981', READY: '#3b82f6' }[m.status] || '#6b7280';
+                          const stLabel = { ENDED: '종료', ACTIVE: '진행중', READY: '예정' }[m.status] || m.status;
+                          const achColor = m.achievementRate >= 100 ? '#10b981' : m.achievementRate >= 80 ? '#f59e0b' : '#ef4444';
+                          return (
+                            <tr key={m.id}>
+                              <td style={td3}>{m.sellerName}</td>
+                              <td style={td3}>{m.managerName}</td>
+                              <td style={{ ...td3, textAlign: 'center' }}>
+                                <span style={{ color: stColor, fontWeight: 600 }}>{stLabel}</span>
+                              </td>
+                              <td style={{ ...td3, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
+                              <td style={{ ...td3, textAlign: 'right' }}>{m.orderCount.toLocaleString('ko-KR')}건</td>
+                              <td style={{ ...td3, textAlign: 'right', color: achColor, fontWeight: 600 }}>{m.achievementRate?.toFixed(0)}%</td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const th3 = { padding: '8px 10px', fontSize: 11, color: '#6b7280', fontWeight: 500, textAlign: 'left', borderBottom: '1px solid #e5e7eb' };
+const td3 = { padding: '8px 10px', fontSize: 12, borderBottom: '1px solid #f3f4f6' };
+
 // ─────────────── 메인 ───────────────
 export default function Preview() {
   return (
@@ -586,6 +756,11 @@ export default function Preview() {
       {/* 마켓 현황 */}
       <div style={{ marginBottom: 24 }}>
         <MarketsSection />
+      </div>
+
+      {/* 브랜드별 현황 */}
+      <div style={{ marginBottom: 24 }}>
+        <BrandsSection />
       </div>
 
       <div style={{
