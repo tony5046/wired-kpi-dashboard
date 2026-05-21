@@ -100,13 +100,23 @@ function genMarkets() {
     const brand = BRAND_NAMES[(i * 3) % BRAND_NAMES.length];
     const seed1 = ((i * 9301 + 49297) % 233280) / 233280;
     const seed2 = ((i * 7919 + 91) % 233280) / 233280;
-    // 매출 5~250 백만원 분포 (편향: 큰 매출 적고 작은 매출 많이)
+    const seed3 = ((i * 4567 + 31) % 233280) / 233280;
     const sales = Math.round(Math.pow(seed1, 2) * 250 + 3);
     const orderCount = Math.max(5, Math.round(sales * (3 + seed2 * 4)));
     const estimatedSales = Math.round(sales * (0.7 + seed2 * 0.7));
     const statuses = ['ENDED','ENDED','ENDED','ACTIVE','READY'];
     const status = statuses[i % statuses.length];
     const day = (i % 28) + 1;
+
+    // CS율 분포 (대부분 0~4%, 일부 5~10%, 소수 15%+)
+    const csBase = (i % 11 === 0) ? 15 + seed3 * 10
+                  : (i % 5 === 0) ? 5 + seed3 * 5
+                  : seed3 * 4;
+    const returnCount = Math.round((orderCount * csBase / 100) * 0.6);
+    const cancelCount = Math.round((orderCount * csBase / 100) * 0.4);
+    const csIssues = returnCount + cancelCount;
+    const csRate = orderCount > 0 ? (csIssues / orderCount) * 100 : 0;
+
     list.push({
       id: 10000 + i,
       name: `${brand}_${seller}_2026-05-${String(day).padStart(2,'0')}`,
@@ -117,6 +127,10 @@ function genMarkets() {
       orderCount,
       estimatedSales,
       achievementRate: estimatedSales > 0 ? (sales / estimatedSales) * 100 : null,
+      returnCount,
+      cancelCount,
+      csIssues,
+      csRate,
       status,
       startedAt: `2026-05-${String(day).padStart(2,'0')}`,
       endedAt: `2026-05-${String(Math.min(day + 2, 31)).padStart(2,'0')}`,
@@ -468,6 +482,7 @@ function MarketsSection() {
           <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문건수 ↓</SortBtn>
           <SortBtn active={sortBy === 'estimatedSales'} onClick={() => setSortBy('estimatedSales')}>예상매출 ↓</SortBtn>
           <SortBtn active={sortBy === 'achievementRate'} onClick={() => setSortBy('achievementRate')}>달성률 ↓</SortBtn>
+          <SortBtn active={sortBy === 'csRate'} onClick={() => setSortBy('csRate')}>CS율 ↓</SortBtn>
         </div>
       </div>
 
@@ -490,6 +505,7 @@ function MarketsSection() {
               <th style={{ ...th2 }}>상태</th>
               <th style={{ ...th2, textAlign: 'right' }}>매출</th>
               <th style={{ ...th2, textAlign: 'right' }}>주문건수</th>
+              <th style={{ ...th2, textAlign: 'right' }} title="반품 + 취소 건수 / 주문건수">CS율</th>
               <th style={{ ...th2, textAlign: 'right' }}>예상매출</th>
               <th style={{ ...th2, textAlign: 'right' }}>달성률</th>
             </tr>
@@ -499,6 +515,8 @@ function MarketsSection() {
               const stColor = { ENDED: '#6b7280', ACTIVE: '#10b981', READY: '#3b82f6', CANCELED: '#ef4444' }[m.status] || '#6b7280';
               const stLabel = { ENDED: '종료', ACTIVE: '진행중', READY: '예정', CANCELED: '취소' }[m.status] || m.status;
               const achColor = m.achievementRate == null ? '#9ca3af' : m.achievementRate >= 100 ? '#10b981' : m.achievementRate >= 80 ? '#f59e0b' : '#ef4444';
+              // CS율: 낮을수록 좋음
+              const csColor = m.csRate < 3 ? '#10b981' : m.csRate < 7 ? '#f59e0b' : '#ef4444';
               return (
                 <tr key={m.id}>
                   <td style={{ ...td2, color: '#9ca3af' }}>{i + 1}</td>
@@ -508,6 +526,10 @@ function MarketsSection() {
                   <td style={{ ...td2 }}><span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span></td>
                   <td style={{ ...td2, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
                   <td style={{ ...td2, textAlign: 'right' }}>{m.orderCount.toLocaleString('ko-KR')}건</td>
+                  <td style={{ ...td2, textAlign: 'right' }} title={`반품 ${m.returnCount}건 + 취소 ${m.cancelCount}건`}>
+                    <span style={{ color: csColor, fontWeight: 600 }}>{m.csRate.toFixed(1)}%</span>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{m.csIssues}건</div>
+                  </td>
                   <td style={{ ...td2, textAlign: 'right', color: '#6b7280' }}>{fmt(m.estimatedSales)}</td>
                   <td style={{ ...td2, textAlign: 'right', color: achColor, fontWeight: 600 }}>{m.achievementRate?.toFixed(0)}%</td>
                 </tr>
@@ -590,12 +612,14 @@ function BrandsSection() {
         orderCount: 0,
         marketCount: 0,
         estimatedSales: 0,
+        csIssues: 0,
         markets: [],
         sellers: new Set(),
       };
       cur.sales += m.sales;
       cur.orderCount += m.orderCount;
       cur.estimatedSales += m.estimatedSales;
+      cur.csIssues += m.csIssues;
       cur.marketCount += 1;
       cur.markets.push(m);
       cur.sellers.add(m.sellerName);
@@ -605,6 +629,7 @@ function BrandsSection() {
       ...x,
       sellers: [...x.sellers],
       achievementRate: x.estimatedSales > 0 ? (x.sales / x.estimatedSales) * 100 : 0,
+      csRate: x.orderCount > 0 ? (x.csIssues / x.orderCount) * 100 : 0,
     }));
   }, []);
 
@@ -654,6 +679,7 @@ function BrandsSection() {
           <SortBtn active={sortBy === 'marketCount'} onClick={() => setSortBy('marketCount')}>공구건수 ↓</SortBtn>
           <SortBtn active={sortBy === 'estimatedSales'} onClick={() => setSortBy('estimatedSales')}>예상매출 ↓</SortBtn>
           <SortBtn active={sortBy === 'achievementRate'} onClick={() => setSortBy('achievementRate')}>달성률 ↓</SortBtn>
+          <SortBtn active={sortBy === 'csRate'} onClick={() => setSortBy('csRate')}>CS율 ↓</SortBtn>
         </div>
       </div>
 
@@ -665,8 +691,8 @@ function BrandsSection() {
       {/* 브랜드 헤더 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '36px minmax(140px,1.3fr) 65px 75px 95px 80px 65px 95px 65px 30px',
-        gap: 10, padding: '8px 14px',
+        gridTemplateColumns: '34px minmax(130px,1.2fr) 60px 70px 90px 75px 60px 90px 60px 60px 28px',
+        gap: 8, padding: '8px 12px',
         background: '#f9fafb', borderRadius: 6,
         fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 6,
       }}>
@@ -679,6 +705,7 @@ function BrandsSection() {
         <div style={{ textAlign: 'right' }}>공구건수</div>
         <div style={{ textAlign: 'right' }}>예상매출</div>
         <div style={{ textAlign: 'right' }}>달성률</div>
+        <div style={{ textAlign: 'right' }} title="반품+취소 / 주문">CS율</div>
         <div></div>
       </div>
 
@@ -699,8 +726,8 @@ function BrandsSection() {
                 onClick={() => setExpanded(isOpen ? null : b.name)}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '36px minmax(140px,1.3fr) 65px 75px 95px 80px 65px 95px 65px 30px',
-                  gap: 10, padding: '12px 14px', cursor: 'pointer',
+                  gridTemplateColumns: '34px minmax(130px,1.2fr) 60px 70px 90px 75px 60px 90px 60px 60px 28px',
+                  gap: 8, padding: '12px 12px', cursor: 'pointer',
                   background: isOpen ? '#eff6ff' : '#fff',
                   alignItems: 'center', fontSize: 13,
                 }}
@@ -734,6 +761,10 @@ function BrandsSection() {
                   textAlign: 'right', fontWeight: 600, fontSize: 12,
                   color: b.achievementRate >= 100 ? '#10b981' : b.achievementRate >= 80 ? '#f59e0b' : '#ef4444',
                 }}>{b.achievementRate.toFixed(0)}%</div>
+                <div style={{
+                  textAlign: 'right', fontSize: 12, fontWeight: 600,
+                  color: b.csRate < 3 ? '#10b981' : b.csRate < 7 ? '#f59e0b' : '#ef4444',
+                }} title={`CS이슈 ${b.csIssues}건`}>{b.csRate.toFixed(1)}%</div>
                 <div style={{ textAlign: 'right', color: '#9ca3af' }}>{isOpen ? '▲' : '▼'}</div>
               </div>
 
