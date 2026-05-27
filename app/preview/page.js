@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import ChatWidget from '../chat-widget';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -50,15 +50,15 @@ const PRODUCT_MGRS = [
 
 const SELLERS = [
   { name: '오인스', sales: 1480, lastYear: 1320 },
-  { name: '달빛', sales: 980, lastYear: 720 },
+  { name: '달빛언니', sales: 980, lastYear: 720 },
   { name: '심플팩토리', sales: 590, lastYear: 650 },
-  { name: '김영은마켓', sales: 410, lastYear: 380 },
+  { name: '김영은', sales: 410, lastYear: 380 },
   { name: '아임박선생', sales: 320, lastYear: 150 },
   { name: '바이미룸', sales: 280, lastYear: 0 },
-  { name: '대랑맘', sales: 220, lastYear: 180 },
+  { name: '선선부부하우스', sales: 250, lastYear: 0 },
+  { name: '모노마켓', sales: 220, lastYear: 0 },
+  { name: '풀킴', sales: 210, lastYear: 0 },
   { name: '미니결', sales: 190, lastYear: 200 },
-  { name: '포유홈', sales: 165, lastYear: 140 },
-  { name: '김별샘', sales: 150, lastYear: 110 },
 ];
 
 const BRANDS = [
@@ -76,13 +76,42 @@ const BRANDS = [
 
 // ─── 100건 마켓 모의 데이터 ───
 const MGR_OF_SELLER = {
-  '오인스': '김규민', '달빛': '정석호', '심플팩토리': '김규민', '김영은마켓': '정석호',
-  '아임박선생': '강규성', '바이미룸': '김규민', '대랑맘': '강규성', '미니결': '정석호',
+  '오인스': '김규민', '달빛언니': '정석호', '심플팩토리': '김규민', '김영은': '정석호',
+  '아임박선생': '강규성', '바이미룸': '김규민', '모노마켓': '강규성', '미니결': '정석호',
   '포유홈': '김규민', '김별샘': '강규성', '나풀나풀': '정석호', '그집1303': '김규민',
   '깎언니': '강규성', '런던하이': '정석호', '히히스카이라운지': '김규민', '코앤텍': '최예린',
-  '빅토리사': '최예린', '선선부부하우스': '강규성', '매주가족': '정석호', '앙젤리크': '김규민',
+  '빅토리사': '최예린', '선선부부하우스': '강규성', '풀킴': '정석호', '앙젤리크': '김규민',
 };
 const SELLER_NAMES = Object.keys(MGR_OF_SELLER);
+
+// 🤝 파트너 셀러 (노션 "🎁 와이어드 파트너" 페이지 기준)
+// 와이어드민 셀러명 ↔ 노션 페이지 URL 매핑
+const PARTNER_SELLERS = {
+  '선선부부하우스': {
+    notionTitle: '2905HOME_COMPANY',
+    notionUrl: 'https://www.notion.so/wiredcompany/2544120083b08086a1e9f533dd2dcc24',
+  },
+  '김영은': {
+    notionTitle: '조이풀영은 X 와이어드컴퍼니',
+    notionUrl: 'https://www.notion.so/wiredcompany/2544120083b0804e97e9d355492a9f5a',
+  },
+  '달빛언니': {
+    notionTitle: 'MOON.LIGHT COMPANY',
+    notionUrl: 'https://www.notion.so/wiredcompany/2544120083b080e889c5ea45a008896c',
+  },
+  '오인스': {
+    notionTitle: '오인스마켓',
+    notionUrl: 'https://www.notion.so/wiredcompany/4b95b76922a7421db79bf1563290545c',
+  },
+  '모노마켓': {
+    notionTitle: '모노마켓 X 와이어드컴퍼니',
+    notionUrl: 'https://www.notion.so/wiredcompany/31e4120083b0801ea881f6a563c5973d',
+  },
+  '풀킴': {
+    notionTitle: '풀킴님 워크스페이스',
+    notionUrl: 'https://www.notion.so/wiredcompany/31f4120083b08053a12bee60e9473c46',
+  },
+};
 const BRAND_NAMES = ['동국제약','오로바일렌','퓨어레비','드시모네','허그베어','테코야','블랙홀 코팅큐','디귿','트루티','트루쿡','씨밀렉스','신일','코닥','VDL','로라애슐리','메디힐','풀무원','나무엑스','경자국밥','콤비타'];
 
 // 브랜드 메타 (담당자 + 거래형태)
@@ -98,6 +127,37 @@ const BRAND_INFO = Object.fromEntries(
 const MARKETING_MGRS = ['이지은', '김민지', '오세영', '한지원'];
 const CS_MGRS = ['박지원', '김선영', '최유진'];
 const LOGISTICS_MGRS = ['최성훈', '이대성', '정민우'];
+
+// 노션 콘텐츠 아이디어 풀 (모의)
+const CONTENT_IDEAS_POOL = [
+  '엄마들의 후기 인터뷰 릴스',
+  '신상품 언박싱 콘텐츠',
+  '특가 카운트다운 스토리',
+  '제품 디테일 클로즈업',
+  '실사용 BGM 영상',
+  '비교 콘텐츠 (vs 경쟁사)',
+  '오픈 직전 티저',
+  '리뷰어 협업 영상',
+  '셀러 인사이트 카드뉴스',
+  '리뷰 모아보기',
+  '실시간 후기 모음',
+  '브랜드 스토리',
+];
+
+const EVENTS_POOL = [
+  '1+1 사은품 증정',
+  '선착순 100명 추가 할인',
+  '결제링크 오픈 24시간 한정',
+  '인스타 팔로워 추가 5%',
+  '리뷰 작성 시 적립금',
+  '동시 구매 시 배송비 무료',
+  '재구매 고객 추가 혜택',
+  null, // 이벤트 없음
+];
+
+// 판매 채널 / 담당 팀 (노션에서 가져오는 메타)
+const CHANNELS_POOL = ['본사쇼핑몰', '카카오선물하기', '네이버스마트스토어', '본사쇼핑몰 + 카카오'];
+const NOTION_TEAMS_POOL = ['와이어드컴퍼니', '선선부부', '달빛', '오인스컴퍼니', '에이치케이팀'];
 
 function genMarkets() {
   const list = [];
@@ -132,6 +192,27 @@ function genMarkets() {
     const exposure = status !== 'READY' ? Math.round(sales * 1000 * (1 + seed2 * 4)) : null;
     const clickRate = status !== 'READY' ? 1 + seed3 * 5 : null;
 
+    // 노션 메타 (모의)
+    const openH = 9 + Math.floor(seed3 * 8);  // 9~16시
+    const closeDay = Math.min(day + 2, 31);
+    const closeH = 18 + Math.floor(seed4 * 6); // 18~23시
+    const paymentLinkOpenAt = `2026-05-${String(day).padStart(2,'0')} ${String(openH).padStart(2,'0')}:00`;
+    const paymentLinkCloseAt = `2026-05-${String(closeDay).padStart(2,'0')} ${String(closeH).padStart(2,'0')}:59`;
+    const event = EVENTS_POOL[i % EVENTS_POOL.length];
+    const stock = 100 + Math.floor(seed1 * 900); // 100~1000
+    const channel = CHANNELS_POOL[i % CHANNELS_POOL.length];
+    const notionTeam = NOTION_TEAMS_POOL[i % NOTION_TEAMS_POOL.length];
+    // 콘텐츠 아이디어 3~5개 픽
+    const ideaCount = 3 + (i % 3);
+    const contentIdeas = [];
+    const startIdx = (i * 5) % CONTENT_IDEAS_POOL.length;
+    for (let k = 0; k < ideaCount; k++) {
+      contentIdeas.push(CONTENT_IDEAS_POOL[(startIdx + k) % CONTENT_IDEAS_POOL.length]);
+    }
+    const notionPageUrl = `https://www.notion.so/wiredcompany/market-${10000 + i}`;
+    const lowestPriceIssue = (i % 13 === 0); // 가끔 최저가 이슈
+    const materialsDelivered = (i % 7 !== 0); // 자료 전달 여부
+
     list.push({
       id: 10000 + i,
       name: `${brand}_${seller}_2026-05-${String(day).padStart(2,'0')}`,
@@ -159,6 +240,17 @@ function genMarkets() {
       status,
       startedAt: `2026-05-${String(day).padStart(2,'0')}`,
       endedAt: `2026-05-${String(Math.min(day + 2, 31)).padStart(2,'0')}`,
+      // 노션 메타
+      paymentLinkOpenAt,
+      paymentLinkCloseAt,
+      event,
+      stock,
+      channel,
+      notionTeam,
+      contentIdeas,
+      notionPageUrl,
+      lowestPriceIssue,
+      materialsDelivered,
     });
   }
   return list;
@@ -443,12 +535,269 @@ function RankList({ title, emoji, hint, rows }) {
   );
 }
 
+// ─────────────── 🤝 파트너셀러 배지 ───────────────
+function PartnerBadge() {
+  return (
+    <span style={{
+      fontSize: 10, padding: '2px 6px', borderRadius: 8,
+      background: 'linear-gradient(135deg, #fde68a 0%, #fcd34d 100%)',
+      color: '#78350f', fontWeight: 700,
+      border: '1px solid #f59e0b',
+    }} title="와이어드 파트너 셀러 (노션 등록됨)">🤝 파트너</span>
+  );
+}
+
+// ─────────────── 🤝 파트너 셀러 섹션 ───────────────
+function PartnerSellersSection() {
+  const partnerNames = Object.keys(PARTNER_SELLERS);
+
+  // 마켓 데이터로부터 파트너별 누적 매출/주문 집계
+  const stats = useMemo(() => {
+    const map = new Map();
+    for (const m of MARKETS) {
+      if (!PARTNER_SELLERS[m.sellerName]) continue;
+      const cur = map.get(m.sellerName) || {
+        name: m.sellerName,
+        sales: 0, orderCount: 0, marketCount: 0, csIssues: 0,
+        managerName: m.managerName,
+      };
+      cur.sales += m.sales;
+      cur.orderCount += m.orderCount;
+      cur.csIssues += m.csIssues;
+      cur.marketCount += 1;
+      map.set(m.sellerName, cur);
+    }
+    // PARTNER_SELLERS 순서대로 정렬, 매출 큰 순
+    const arr = partnerNames.map(name => map.get(name) || {
+      name, sales: 0, orderCount: 0, marketCount: 0, csIssues: 0, managerName: MGR_OF_SELLER[name] || '-',
+    });
+    return arr.sort((a, b) => b.sales - a.sales);
+  }, []);
+
+  return (
+    <div style={card}>
+      <SectionTitle
+        emoji="🤝"
+        title="와이어드 파트너 셀러"
+        hint="노션 '🎁 와이어드 파트너' 페이지에 등록된 6명 · 카드 클릭 → 해당 파트너 노션 페이지로 이동"
+      />
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+      }}>
+        {stats.map((p, i) => {
+          const partner = PARTNER_SELLERS[p.name];
+          const csRate = p.orderCount > 0 ? (p.csIssues / p.orderCount) * 100 : 0;
+          const csColor = csRate < 3 ? '#10b981' : csRate < 7 ? '#f59e0b' : '#ef4444';
+          return (
+            <a
+              key={p.name}
+              href={partner.notionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', textDecoration: 'none', color: 'inherit',
+                padding: 14, background: i === 0 ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : '#faf9f6',
+                border: '1px solid ' + (i === 0 ? '#fcd34d' : '#e7e3da'),
+                borderRadius: 10, transition: 'transform 0.1s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {i === 0 && <span style={{ fontSize: 14 }}>🥇</span>}
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#37352f' }}>{p.name}</span>
+                </div>
+                <span style={{ fontSize: 10, color: '#a47148', fontWeight: 600 }}>노션 ↗</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#6b6b6b', marginBottom: 10 }}>
+                {partner.notionTitle}
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
+                paddingTop: 10, borderTop: '1px solid #e7e3da', fontSize: 11,
+              }}>
+                <div>
+                  <div style={{ color: '#6b6b6b' }}>💰 매출</div>
+                  <div style={{ fontWeight: 700, color: '#37352f', fontSize: 13 }}>{fmt(p.sales)}</div>
+                </div>
+                <div>
+                  <div style={{ color: '#6b6b6b' }}>🛒 마켓</div>
+                  <div style={{ fontWeight: 700, color: '#37352f', fontSize: 13 }}>{p.marketCount}건</div>
+                </div>
+                <div>
+                  <div style={{ color: '#6b6b6b' }}>📦 주문</div>
+                  <div style={{ fontWeight: 600, color: '#37352f' }}>{p.orderCount.toLocaleString('ko-KR')}건</div>
+                </div>
+                <div>
+                  <div style={{ color: '#6b6b6b' }}>🎧 CS율</div>
+                  <div style={{ fontWeight: 700, color: csColor }}>{csRate.toFixed(1)}%</div>
+                </div>
+              </div>
+              <div style={{
+                marginTop: 10, paddingTop: 8, borderTop: '1px solid #e7e3da',
+                fontSize: 11, color: '#6b6b6b',
+              }}>
+                담당 <strong style={{ color: '#37352f' }}>{p.managerName}</strong>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── 노션 상세 드로어 (마켓 펼침 영역) ───────────────
+function NotionDrawer({ m }) {
+  // 노션 톤 (살짝 크림색 + 어두운 갈색 텍스트)
+  const NotionBg = '#faf9f6';
+  const NotionBorder = '#e7e3da';
+  const NotionAccent = '#a47148';
+
+  // 파트너셀러인지 확인 — 파트너면 실제 노션 페이지 URL 사용
+  const partner = PARTNER_SELLERS[m.sellerName];
+  const targetUrl = partner ? partner.notionUrl : m.notionPageUrl;
+  const targetLabel = partner ? `${partner.notionTitle} 페이지` : '마켓 캘린더';
+
+  return (
+    <div style={{
+      padding: 18,
+      background: NotionBg,
+      borderTop: `1px dashed ${NotionBorder}`,
+    }}>
+      {/* 노션 헤더 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 14, paddingBottom: 10, borderBottom: `1px solid ${NotionBorder}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            display: 'inline-flex', width: 26, height: 26, borderRadius: 6,
+            background: '#fff', border: `1px solid ${NotionBorder}`,
+            alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#37352f',
+          }}>N</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#37352f', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📋 노션에서 가져온 마켓 기획 정보
+              {partner && <PartnerBadge />}
+            </div>
+            <div style={{ fontSize: 11, color: '#6b6b6b' }}>
+              {partner ? partner.notionTitle : m.notionTeam} · {targetLabel}
+            </div>
+          </div>
+        </div>
+        <a
+          href={targetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 12, color: NotionAccent, fontWeight: 600,
+            textDecoration: 'none', padding: '6px 12px',
+            background: '#fff', border: `1px solid ${NotionBorder}`, borderRadius: 6,
+          }}
+        >{partner ? '파트너 워크스페이스 ↗' : '노션에서 전체 보기 ↗'}</a>
+      </div>
+
+      {/* 핵심 정보 그리드 */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14,
+      }}>
+        <NotionFact label="🗓️ 진행 기간" value={`${m.startedAt} ~ ${m.endedAt}`} />
+        <NotionFact label="📍 담당 팀" value={m.notionTeam} />
+        <NotionFact label="🛍️ 판매 채널" value={m.channel} />
+        <NotionFact
+          label="📦 재고"
+          value={`${m.stock.toLocaleString('ko-KR')}개`}
+          tone={m.stock < 200 ? 'warn' : 'ok'}
+        />
+      </div>
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14,
+      }}>
+        <NotionFact label="🔗 결제링크 오픈" value={m.paymentLinkOpenAt} />
+        <NotionFact label="🔒 결제링크 마감" value={m.paymentLinkCloseAt} />
+      </div>
+
+      {/* 이벤트 */}
+      <div style={{
+        padding: 12, marginBottom: 14, background: '#fff',
+        border: `1px solid ${NotionBorder}`, borderRadius: 8,
+      }}>
+        <div style={{ fontSize: 11, color: '#6b6b6b', marginBottom: 6 }}>🎁 이벤트</div>
+        <div style={{ fontSize: 13, color: '#37352f', fontWeight: 500 }}>
+          {m.event ? m.event : <span style={{ color: '#9ca3af' }}>이벤트 없음</span>}
+        </div>
+      </div>
+
+      {/* 콘텐츠 아이디어 */}
+      <div style={{
+        padding: 14, marginBottom: 14, background: '#fff',
+        border: `1px solid ${NotionBorder}`, borderRadius: 8,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#37352f' }}>
+            📸 마케팅 콘텐츠 아이디어
+          </div>
+          <span style={{ fontSize: 11, color: '#6b6b6b' }}>
+            작성자: <strong style={{ color: '#37352f' }}>{m.marketingMgr}</strong>
+          </span>
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#37352f', lineHeight: 1.8 }}>
+          {m.contentIdeas.map((idea, idx) => (
+            <li key={idx}>{idea}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* 이슈 배지 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {m.lowestPriceIssue && (
+          <span style={{
+            fontSize: 11, padding: '4px 10px', borderRadius: 12, fontWeight: 600,
+            background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5',
+          }}>⚠️ 최저가 이슈</span>
+        )}
+        {!m.materialsDelivered && (
+          <span style={{
+            fontSize: 11, padding: '4px 10px', borderRadius: 12, fontWeight: 600,
+            background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d',
+          }}>📂 자료 미전달</span>
+        )}
+        {m.materialsDelivered && !m.lowestPriceIssue && (
+          <span style={{
+            fontSize: 11, padding: '4px 10px', borderRadius: 12, fontWeight: 600,
+            background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7',
+          }}>✅ 자료 전달 완료 · 가격 이슈 없음</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NotionFact({ label, value, tone }) {
+  const toneColor = tone === 'warn' ? '#92400e' : tone === 'ok' ? '#065f46' : '#37352f';
+  return (
+    <div style={{
+      padding: 10, background: '#fff',
+      border: '1px solid #e7e3da', borderRadius: 8,
+    }}>
+      <div style={{ fontSize: 10, color: '#6b6b6b', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: toneColor }}>{value}</div>
+    </div>
+  );
+}
+
 // ─────────────── 마켓 현황 (탭 + 검색 + 정렬 + 페이징) ───────────────
 function MarketsSection() {
   const [tab, setTab] = useState('all'); // 'all' | manager name
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('sales'); // 'sales' | 'orderCount'
   const [showCount, setShowCount] = useState(50);
+  const [expandedId, setExpandedId] = useState(null); // 펼친 마켓 id
 
   const filtered = useMemo(() => {
     let arr = MARKETS;
@@ -472,7 +821,7 @@ function MarketsSection() {
 
   return (
     <div style={card}>
-      <SectionTitle emoji="🛒" title="이번달 마켓 현황" hint="셀러 담당자별 탭 · 검색 · 매출/주문 기준 정렬 · 50개씩 페이징" />
+      <SectionTitle emoji="🛒" title="이번달 마켓 현황" hint="셀러 담당자별 탭 · 검색 · 정렬 · 50개씩 페이징 · 행 클릭 → 노션 기획 정보 펼침" />
 
       {/* 탭 */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -518,11 +867,21 @@ function MarketsSection() {
         {search && <> · 검색 "<strong>{search}</strong>"</>}
       </div>
 
+      {/* 안내 */}
+      <div style={{
+        padding: '8px 12px', marginBottom: 8, background: '#fffbeb',
+        border: '1px solid #fde68a', borderRadius: 6,
+        fontSize: 12, color: '#78350f',
+      }}>
+        💡 마켓 행을 클릭하면 <strong>노션에서 가져온 컨텐츠 기획·이벤트·재고 정보</strong>가 펼쳐져요
+      </div>
+
       {/* 테이블 */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
+              <th style={{ ...th2, width: 28 }}></th>
               <th style={{ ...th2, width: 40 }}>#</th>
               <th style={{ ...th2, textAlign: 'left' }}>셀러</th>
               <th style={{ ...th2, textAlign: 'left' }}>브랜드</th>
@@ -542,22 +901,44 @@ function MarketsSection() {
               const achColor = m.achievementRate == null ? '#9ca3af' : m.achievementRate >= 100 ? '#10b981' : m.achievementRate >= 80 ? '#f59e0b' : '#ef4444';
               // CS율: 낮을수록 좋음
               const csColor = m.csRate < 3 ? '#10b981' : m.csRate < 7 ? '#f59e0b' : '#ef4444';
+              const isOpen = expandedId === m.id;
               return (
-                <tr key={m.id}>
-                  <td style={{ ...td2, color: '#9ca3af' }}>{i + 1}</td>
-                  <td style={{ ...td2, fontWeight: 500 }}>{m.sellerName}</td>
-                  <td style={td2}>{m.brandName}</td>
-                  <td style={td2}>{m.managerName}</td>
-                  <td style={{ ...td2 }}><span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span></td>
-                  <td style={{ ...td2, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
-                  <td style={{ ...td2, textAlign: 'right' }}>{m.orderCount.toLocaleString('ko-KR')}건</td>
-                  <td style={{ ...td2, textAlign: 'right' }} title={`반품 ${m.returnCount}건 + 취소 ${m.cancelCount}건`}>
-                    <span style={{ color: csColor, fontWeight: 600 }}>{m.csRate.toFixed(1)}%</span>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{m.csIssues}건</div>
-                  </td>
-                  <td style={{ ...td2, textAlign: 'right', color: '#6b7280' }}>{fmt(m.estimatedSales)}</td>
-                  <td style={{ ...td2, textAlign: 'right', color: achColor, fontWeight: 600 }}>{m.achievementRate?.toFixed(0)}%</td>
-                </tr>
+                <Fragment key={m.id}>
+                  <tr
+                    onClick={() => setExpandedId(isOpen ? null : m.id)}
+                    style={{
+                      cursor: 'pointer',
+                      background: isOpen ? '#eff6ff' : 'transparent',
+                    }}
+                  >
+                    <td style={{ ...td2, color: '#9ca3af', textAlign: 'center' }}>{isOpen ? '▲' : '▶'}</td>
+                    <td style={{ ...td2, color: '#9ca3af' }}>{i + 1}</td>
+                    <td style={{ ...td2, fontWeight: 500 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {m.sellerName}
+                        {PARTNER_SELLERS[m.sellerName] && <PartnerBadge />}
+                      </span>
+                    </td>
+                    <td style={td2}>{m.brandName}</td>
+                    <td style={td2}>{m.managerName}</td>
+                    <td style={{ ...td2 }}><span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span></td>
+                    <td style={{ ...td2, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
+                    <td style={{ ...td2, textAlign: 'right' }}>{m.orderCount.toLocaleString('ko-KR')}건</td>
+                    <td style={{ ...td2, textAlign: 'right' }} title={`반품 ${m.returnCount}건 + 취소 ${m.cancelCount}건`}>
+                      <span style={{ color: csColor, fontWeight: 600 }}>{m.csRate.toFixed(1)}%</span>
+                      <div style={{ fontSize: 10, color: '#9ca3af' }}>{m.csIssues}건</div>
+                    </td>
+                    <td style={{ ...td2, textAlign: 'right', color: '#6b7280' }}>{fmt(m.estimatedSales)}</td>
+                    <td style={{ ...td2, textAlign: 'right', color: achColor, fontWeight: 600 }}>{m.achievementRate?.toFixed(0)}%</td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={11} style={{ padding: 0, background: '#faf9f6', borderBottom: '1px solid #e5e7eb' }}>
+                        <NotionDrawer m={m} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
@@ -1066,9 +1447,9 @@ export default function Preview() {
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, margin: 0 }}>🎨 새 디자인 초안 v2 (가상 데이터)</h1>
+        <h1 style={{ fontSize: 24, margin: 0 }}>🎨 새 디자인 초안 v4 — 파트너셀러 + 노션 연동 (가상 데이터)</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          ① 매출 추이 + 목표 달성률  ② 담당자 기여도 (셀러/상품 분리)  ③ TOP 리스트
+          ✨ NEW: 🤝 파트너 셀러 6명 카드 (노션 워크스페이스 바로가기) + 마켓 행 클릭으로 노션 기획 정보 펼침
         </p>
         <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 현재 페이지로</Link>
       </header>
@@ -1083,6 +1464,11 @@ export default function Preview() {
       </div>
       <div style={{ marginBottom: 24 }}>
         <BestTeamwork />
+      </div>
+
+      {/* 파트너 셀러 */}
+      <div style={{ marginBottom: 24 }}>
+        <PartnerSellersSection />
       </div>
 
       {/* 마켓 현황 */}
@@ -1102,12 +1488,14 @@ export default function Preview() {
         padding: 16, background: '#eff6ff', border: '1px solid #bfdbfe',
         borderRadius: 12, fontSize: 14, lineHeight: 1.6,
       }}>
-        💡 <strong>추가 / 수정 부분 알려주세요:</strong>
+        💡 <strong>이번 시안에서 새로 추가된 부분 (노션 연동 + 파트너셀러):</strong>
         <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-          <li><strong>목표 달성률</strong> 차트 우측에 카드 2개 (연간 200억 / 분기 50억) — 위치 OK?</li>
-          <li>차트에 가로 빨간 점선 = 월 평균 목표 — 너무 산만하면 뺄게요</li>
-          <li><strong>담당자</strong>: 셀러 담당자와 상품 담당자 좌우로 분리. 부제목으로 "성과 평가용 아닌 매출 분포" 명시</li>
-          <li>같은 사람이 양쪽에 있어도 따로 표시 (예: 김규민이 셀러담당 1위 + 상품담당 2위)</li>
+          <li>🤝 <strong>파트너 셀러 카드 (6명)</strong> — 선선부부하우스 · 김영은 · 달빛언니 · 오인스 · 모노마켓 · 풀킴</li>
+          <li>카드 클릭 시 해당 파트너의 노션 워크스페이스로 바로 이동 (URL 매핑 완료)</li>
+          <li>마켓 표에서 파트너 셀러 옆에 <strong>🤝 파트너</strong> 배지 표시</li>
+          <li>마켓 행 클릭 → 펼침 영역에서 파트너인 경우 "<strong>파트너 워크스페이스 ↗</strong>" 버튼 노출 (일반 마켓이면 "마켓 캘린더"로)</li>
+          <li>대랑맘은 mock 데이터에서 제외 (노션 아카이브 처리됨)</li>
+          <li>아직 mock 데이터 기반이라 매출/CS 수치는 가상. 실제 와이어드민 API와 연결하면 실시간 데이터로 채워져요</li>
         </ul>
       </div>
     </main>
