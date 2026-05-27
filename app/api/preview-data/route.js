@@ -204,13 +204,27 @@ export async function GET() {
 
       partnerStats,
 
-      // 에러 정보
+      // 에러 정보 — 모든 period의 ordersError/marketsError까지 자세히 노출
       errors: {
-        sheets: sheetData?._error || null,
-        thisMonth: thisMonthView?._error || thisMonthView?.ordersError || thisMonthView?.marketsError || null,
-        thisYear: thisYearView?._error || null,
-        lastMonth: lastMonthView?._error || null,
-        nextMonth: nextMonthView?._error || null,
+        sheets: sheetData?._error || sheetData?.yearly?._error || null,
+        thisMonth_orders: thisMonthView?._error || thisMonthView?.ordersError || null,
+        thisMonth_markets: thisMonthView?.marketsError || null,
+        thisYear_orders: thisYearView?._error || thisYearView?.ordersError || null,
+        thisYear_markets: thisYearView?.marketsError || null,
+        thisQuarter_orders: thisQuarterView?._error || thisQuarterView?.ordersError || null,
+        thisQuarter_markets: thisQuarterView?.marketsError || null,
+        lastMonth_orders: lastMonthView?._error || lastMonthView?.ordersError || null,
+        lastMonth_markets: lastMonthView?.marketsError || null,
+        nextMonth_orders: nextMonthView?._error || nextMonthView?.ordersError || null,
+        nextMonth_markets: nextMonthView?.marketsError || null,
+      },
+
+      // 디버그: 핵심 카운트 (확인용)
+      debug: {
+        thisMonthMarkets: thisMonthView?.marketsList?.length || 0,
+        thisMonthSellers: thisMonthView?.sellers?.length || 0,
+        thisMonthTotalOrders: thisMonthView?.orders?.total?.raw || 0,
+        thisYearTotalSales: thisYearView?.orders?.total?.sales || 0,
       },
     });
   } catch (e) {

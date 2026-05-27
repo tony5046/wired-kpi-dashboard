@@ -1081,12 +1081,26 @@ export default function Preview() {
           {/* 에러 디버깅 (혹시 일부만 실패한 경우) */}
           {data.errors && Object.values(data.errors).some(Boolean) && (
             <div style={{
-              padding: 12, background: '#fffbeb', border: '1px solid #fde68a',
-              borderRadius: 8, fontSize: 11, color: '#78350f', marginBottom: 24,
+              padding: 14, background: '#fef2f2', border: '1px solid #fca5a5',
+              borderRadius: 8, fontSize: 12, color: '#7f1d1d', marginBottom: 24,
             }}>
-              ⚠️ 일부 데이터 가져오기 실패: <code style={{ fontSize: 10 }}>
-                {JSON.stringify(Object.entries(data.errors).filter(([_, v]) => v).map(([k]) => k))}
-              </code>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ 데이터 가져오기 실패 상세</div>
+              <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6 }}>
+                {Object.entries(data.errors).filter(([_, v]) => v).map(([k, v]) => (
+                  <div key={k} style={{ marginBottom: 4, wordBreak: 'break-all' }}>
+                    <strong style={{ color: '#991b1b' }}>{k}:</strong> {String(v).slice(0, 300)}
+                  </div>
+                ))}
+              </div>
+              {data.debug && (
+                <div style={{ marginTop: 10, padding: 8, background: '#fff', borderRadius: 4, fontSize: 11, color: '#374151' }}>
+                  <strong>디버그 카운트:</strong>{' '}
+                  마켓 {data.debug.thisMonthMarkets}개 ·
+                  셀러 {data.debug.thisMonthSellers}명 ·
+                  주문 {data.debug.thisMonthTotalOrders}건 ·
+                  YTD 매출 {(data.debug.thisYearTotalSales || 0).toLocaleString('ko-KR')}원
+                </div>
+              )}
             </div>
           )}
 
