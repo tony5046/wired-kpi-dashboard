@@ -94,6 +94,11 @@ const BRAND_INFO = Object.fromEntries(
   }])
 );
 
+// 5팀 담당자 풀 (모의)
+const MARKETING_MGRS = ['이지은', '김민지', '오세영', '한지원'];
+const CS_MGRS = ['박지원', '김선영', '최유진'];
+const LOGISTICS_MGRS = ['최성훈', '이대성', '정민우'];
+
 function genMarkets() {
   const list = [];
   for (let i = 0; i < 100; i++) {
@@ -102,6 +107,7 @@ function genMarkets() {
     const seed1 = ((i * 9301 + 49297) % 233280) / 233280;
     const seed2 = ((i * 7919 + 91) % 233280) / 233280;
     const seed3 = ((i * 4567 + 31) % 233280) / 233280;
+    const seed4 = ((i * 11003 + 7) % 233280) / 233280;
     const sales = Math.round(Math.pow(seed1, 2) * 250 + 3);
     const orderCount = Math.max(5, Math.round(sales * (3 + seed2 * 4)));
     const estimatedSales = Math.round(sales * (0.7 + seed2 * 0.7));
@@ -109,7 +115,7 @@ function genMarkets() {
     const status = statuses[i % statuses.length];
     const day = (i % 28) + 1;
 
-    // CS율 분포 (대부분 0~4%, 일부 5~10%, 소수 15%+)
+    // CS율
     const csBase = (i % 11 === 0) ? 15 + seed3 * 10
                   : (i % 5 === 0) ? 5 + seed3 * 5
                   : seed3 * 4;
@@ -118,11 +124,25 @@ function genMarkets() {
     const csIssues = returnCount + cancelCount;
     const csRate = orderCount > 0 ? (csIssues / orderCount) * 100 : 0;
 
+    // 물류 KPI (배송완료율 85~100%, 평균 배송일 1.5~4.5)
+    const deliveryRate = status === 'ENDED' ? 85 + seed4 * 15 : null;
+    const avgDeliveryDays = status === 'ENDED' ? 1.5 + seed4 * 3 : null;
+
+    // 마케팅 KPI (콘텐츠 노출수 ~ 매출 × 1000~5000, 클릭률 1~6%)
+    const exposure = status !== 'READY' ? Math.round(sales * 1000 * (1 + seed2 * 4)) : null;
+    const clickRate = status !== 'READY' ? 1 + seed3 * 5 : null;
+
     list.push({
       id: 10000 + i,
       name: `${brand}_${seller}_2026-05-${String(day).padStart(2,'0')}`,
       sellerName: seller,
       managerName: MGR_OF_SELLER[seller],
+      // 5팀 담당자
+      sellerMgr: MGR_OF_SELLER[seller],
+      brandMgr: (BRAND_INFO[brand] || {}).manager || PRODUCT_MGR_NAMES[i % PRODUCT_MGR_NAMES.length],
+      marketingMgr: MARKETING_MGRS[i % MARKETING_MGRS.length],
+      csMgr: CS_MGRS[i % CS_MGRS.length],
+      logisticsMgr: LOGISTICS_MGRS[i % LOGISTICS_MGRS.length],
       brandName: brand,
       sales,
       orderCount,
@@ -132,6 +152,10 @@ function genMarkets() {
       cancelCount,
       csIssues,
       csRate,
+      deliveryRate,
+      avgDeliveryDays,
+      exposure,
+      clickRate,
       status,
       startedAt: `2026-05-${String(day).padStart(2,'0')}`,
       endedAt: `2026-05-${String(Math.min(day + 2, 31)).padStart(2,'0')}`,
@@ -821,6 +845,222 @@ function BrandsSection() {
 const th3 = { padding: '8px 10px', fontSize: 11, color: '#6b7280', fontWeight: 500, textAlign: 'left', borderBottom: '1px solid #e5e7eb' };
 const td3 = { padding: '8px 10px', fontSize: 12, borderBottom: '1px solid #f3f4f6' };
 
+// ─────────────── 팀 합작 대시보드 ───────────────
+
+const ROLE_TABS = [
+  { key: 'seller', label: '🤝 셀러', accent: '#2563eb', mgrField: 'sellerMgr', kpiLabel: '매출', desc: '셀러 발굴/관리' },
+  { key: 'brand', label: '🏷️ 브랜드', accent: '#7c3aed', mgrField: 'brandMgr', kpiLabel: '매출', desc: '브랜드 소싱/매칭' },
+  { key: 'marketing', label: '📣 마케팅', accent: '#f59e0b', mgrField: 'marketingMgr', kpiLabel: '노출수 / 클릭률', desc: '콘텐츠 기획/방향성' },
+  { key: 'cs', label: '🎧 CS', accent: '#10b981', mgrField: 'csMgr', kpiLabel: 'CS율 (낮을수록 ✅)', desc: '고객 응대/만족도' },
+  { key: 'logistics', label: '📦 물류', accent: '#0891b2', mgrField: 'logisticsMgr', kpiLabel: '배송완료율 / 평균 배송일', desc: '배송/재고/입출고' },
+];
+
+function TeamDashboard() {
+  const [roleKey, setRoleKey] = useState('seller');
+  const role = ROLE_TABS.find(r => r.key === roleKey);
+
+  // 역할별 집계
+  const agg = useMemo(() => {
+    const map = new Map();
+    for (const m of MARKETS) {
+      const mgr = m[role.mgrField];
+      if (!mgr) continue;
+      const cur = map.get(mgr) || {
+        name: mgr,
+        marketCount: 0,
+        sales: 0,
+        orderCount: 0,
+        csIssues: 0,
+        exposureSum: 0, exposureN: 0,
+        clickRateSum: 0, clickRateN: 0,
+        deliveryRateSum: 0, deliveryRateN: 0,
+        avgDeliveryDaysSum: 0, avgDeliveryDaysN: 0,
+      };
+      cur.marketCount += 1;
+      cur.sales += m.sales;
+      cur.orderCount += m.orderCount;
+      cur.csIssues += m.csIssues;
+      if (m.exposure != null) { cur.exposureSum += m.exposure; cur.exposureN++; }
+      if (m.clickRate != null) { cur.clickRateSum += m.clickRate; cur.clickRateN++; }
+      if (m.deliveryRate != null) { cur.deliveryRateSum += m.deliveryRate; cur.deliveryRateN++; }
+      if (m.avgDeliveryDays != null) { cur.avgDeliveryDaysSum += m.avgDeliveryDays; cur.avgDeliveryDaysN++; }
+      map.set(mgr, cur);
+    }
+    return [...map.values()].map(x => ({
+      ...x,
+      csRate: x.orderCount > 0 ? (x.csIssues / x.orderCount) * 100 : 0,
+      exposureAvg: x.exposureN > 0 ? x.exposureSum / x.exposureN : 0,
+      clickRateAvg: x.clickRateN > 0 ? x.clickRateSum / x.clickRateN : 0,
+      deliveryRateAvg: x.deliveryRateN > 0 ? x.deliveryRateSum / x.deliveryRateN : 0,
+      avgDeliveryDaysAvg: x.avgDeliveryDaysN > 0 ? x.avgDeliveryDaysSum / x.avgDeliveryDaysN : 0,
+    }));
+  }, [roleKey]);
+
+  // 역할별 정렬 키
+  const sortKey = ({
+    seller: 'sales', brand: 'sales',
+    marketing: 'exposureAvg',
+    cs: 'csRate', // CS는 낮을수록 좋음 (ascending)
+    logistics: 'deliveryRateAvg',
+  })[roleKey];
+  const csAsc = roleKey === 'cs'; // CS만 오름차순
+  const sorted = [...agg].sort((a, b) => csAsc ? (a[sortKey] - b[sortKey]) : (b[sortKey] - a[sortKey]));
+
+  return (
+    <div style={card}>
+      <SectionTitle
+        emoji="👥"
+        title="팀 합작 대시보드"
+        hint="각 마켓은 5팀의 합작 · 역할별로 자기 KPI 기준 정렬"
+      />
+
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {ROLE_TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setRoleKey(t.key)}
+            style={{
+              padding: '10px 16px', fontSize: 13, fontWeight: roleKey === t.key ? 700 : 500,
+              background: roleKey === t.key ? t.accent : '#fff',
+              color: roleKey === t.key ? '#fff' : '#374151',
+              border: '1px solid ' + (roleKey === t.key ? t.accent : '#d1d5db'),
+              borderRadius: 8, cursor: 'pointer',
+            }}
+          >{t.label}</button>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+        <strong style={{ color: '#374151' }}>{role.desc}</strong> · 주요 지표: <strong>{role.kpiLabel}</strong>
+      </div>
+
+      {/* 담당자별 KPI 카드 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {sorted.map((p, i) => {
+          const isTop = i === 0;
+          return (
+            <div key={p.name} style={{
+              padding: 14,
+              background: isTop ? `${role.accent}10` : '#f9fafb',
+              border: '1px solid ' + (isTop ? role.accent : '#e5e7eb'),
+              borderRadius: 10,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {isTop && <span style={{ fontSize: 14 }}>🥇</span>}
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{p.name}</span>
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>마켓 {p.marketCount}건</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 20, fontSize: 13, color: '#374151', flexWrap: 'wrap' }}>
+                {roleKey === 'seller' || roleKey === 'brand' ? (
+                  <>
+                    <div>💰 매출 <strong style={{ color: role.accent }}>{fmt(p.sales)}</strong></div>
+                    <div>📦 주문 {p.orderCount.toLocaleString('ko-KR')}건</div>
+                  </>
+                ) : roleKey === 'marketing' ? (
+                  <>
+                    <div>👁️ 평균 노출 <strong style={{ color: role.accent }}>{Math.round(p.exposureAvg).toLocaleString('ko-KR')}회</strong></div>
+                    <div>🖱️ 평균 CTR <strong>{p.clickRateAvg.toFixed(2)}%</strong></div>
+                    <div>📦 주문 {p.orderCount.toLocaleString('ko-KR')}건</div>
+                  </>
+                ) : roleKey === 'cs' ? (
+                  <>
+                    <div>🎧 CS율 <strong style={{ color: p.csRate < 3 ? '#10b981' : p.csRate < 7 ? '#f59e0b' : '#ef4444' }}>{p.csRate.toFixed(2)}%</strong></div>
+                    <div>💢 이슈 {p.csIssues}건 / 주문 {p.orderCount.toLocaleString('ko-KR')}</div>
+                  </>
+                ) : (
+                  <>
+                    <div>📦 배송완료율 <strong style={{ color: p.deliveryRateAvg >= 95 ? '#10b981' : p.deliveryRateAvg >= 90 ? '#f59e0b' : '#ef4444' }}>{p.deliveryRateAvg.toFixed(1)}%</strong></div>
+                    <div>⏱️ 평균 배송 <strong>{p.avgDeliveryDaysAvg.toFixed(1)}일</strong></div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────── 베스트 팀워크 ───────────────
+function BestTeamwork() {
+  // 매출 큰 + CS율 낮은 + 배송 좋은 마켓 = 종합 점수
+  const scored = MARKETS
+    .filter(m => m.status === 'ENDED' && m.deliveryRate != null) // 종료된 마켓만
+    .map(m => {
+      const salesScore = m.sales / 250 * 50; // 0~50
+      const csScore = Math.max(0, 30 - m.csRate * 4); // CS 낮을수록 30점 만점
+      const deliveryScore = ((m.deliveryRate - 80) / 20) * 20; // 80~100% → 0~20점
+      return { ...m, _score: salesScore + csScore + deliveryScore };
+    })
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 3);
+
+  return (
+    <div style={card}>
+      <SectionTitle
+        emoji="🏆"
+        title="이번달 베스트 팀워크 TOP 3"
+        hint="매출 + CS율 + 배송완료율 종합 점수 — 5팀 모두 잘한 마켓"
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {scored.map((m, i) => {
+          const medals = ['🥇', '🥈', '🥉'];
+          return (
+            <div key={m.id} style={{
+              padding: 16,
+              background: i === 0
+                ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
+                : '#f9fafb',
+              border: '1px solid ' + (i === 0 ? '#fcd34d' : '#e5e7eb'),
+              borderRadius: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 22 }}>{medals[i]}</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{m.brandName} × {m.sellerName}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>{m.startedAt} ~ {m.endedAt}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div>💰 매출 <strong>{fmt(m.sales)}</strong></div>
+                <div>🎧 CS율 <strong style={{ color: '#10b981' }}>{m.csRate.toFixed(1)}%</strong></div>
+                <div>📦 배송완료 <strong style={{ color: '#10b981' }}>{m.deliveryRate.toFixed(0)}%</strong></div>
+                <div>⏱️ 평균 {m.avgDeliveryDays.toFixed(1)}일</div>
+              </div>
+
+              <div style={{ fontSize: 12, color: '#374151', borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
+                👏 함께 만든 팀:
+                <span style={{ marginLeft: 8 }}>
+                  <Chip text={`🤝 ${m.sellerMgr}`} />
+                  <Chip text={`🏷️ ${m.brandMgr}`} />
+                  <Chip text={`📣 ${m.marketingMgr}`} />
+                  <Chip text={`🎧 ${m.csMgr}`} />
+                  <Chip text={`📦 ${m.logisticsMgr}`} />
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Chip({ text }) {
+  return (
+    <span style={{
+      display: 'inline-block', fontSize: 11, padding: '3px 8px',
+      background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+      marginRight: 4, marginBottom: 4, fontWeight: 500,
+    }}>{text}</span>
+  );
+}
+
 // ─────────────── 메인 ───────────────
 export default function Preview() {
   return (
@@ -835,6 +1075,14 @@ export default function Preview() {
 
       <div style={{ marginBottom: 24 }}>
         <TrendChart />
+      </div>
+
+      {/* 팀 합작 대시보드 */}
+      <div style={{ marginBottom: 16 }}>
+        <TeamDashboard />
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <BestTeamwork />
       </div>
 
       {/* 마켓 현황 */}
