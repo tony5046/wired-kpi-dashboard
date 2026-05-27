@@ -19,10 +19,11 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 1. 캐시 무효화
-  revalidateTag('dashboard');
-  revalidateTag('sheets');
-  revalidateTag('orders');
+  // 1. 캐시 무효화 — 현재 진행 중인 데이터만 (과거 데이터는 TTL로 자연 갱신)
+  // PAST_LOCKED(30일 TTL) / PAST_RECENT(7일 TTL)는 안 건드림.
+  revalidateTag('sheets');           // 구글시트는 매일
+  revalidateTag('orders-current');   // 현재 기간 주문만
+  revalidateTag('markets-current');  // 현재 기간 마켓만
 
   // 2. 가벼운 기본 뷰 prewarm만 (60초 한도 안에 들어가도록)
   const result = { revalidated: true, at: new Date().toISOString() };
