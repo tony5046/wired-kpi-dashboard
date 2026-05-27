@@ -112,7 +112,55 @@ const PARTNER_SELLERS = {
     notionUrl: 'https://www.notion.so/wiredcompany/31f4120083b08053a12bee60e9473c46',
   },
 };
-const BRAND_NAMES = ['동국제약','오로바일렌','퓨어레비','드시모네','허그베어','테코야','블랙홀 코팅큐','디귿','트루티','트루쿡','씨밀렉스','신일','코닥','VDL','로라애슐리','메디힐','풀무원','나무엑스','경자국밥','콤비타'];
+
+// 파트너 셀러별 월별 통계 (모의)
+// 오늘 = 2026-05-27 기준 → 저번달=4월 / 이번달=5월 / 다음달=6월(예상)
+// 누적 = 1~5월
+const PARTNER_STATS = {
+  '오인스': {
+    ytdSales: 6420,  // 2026년 1~5월 누적 (백만원)
+    lastMonth:  { sales: 1180, marketCount: 4 },
+    thisMonth:  { sales: 1450, marketCount: 5 },
+    nextMonth:  { sales: 1620, marketCount: 6 }, // 예상
+    reels:      { lastMonth: 82000, thisMonth: 95000 },
+  },
+  '달빛언니': {
+    ytdSales: 4280,
+    lastMonth:  { sales: 780, marketCount: 4 },
+    thisMonth:  { sales: 920, marketCount: 5 },
+    nextMonth:  { sales: 1080, marketCount: 6 },
+    reels:      { lastMonth: 65000, thisMonth: 78000 },
+  },
+  '선선부부하우스': {
+    ytdSales: 2950,
+    lastMonth:  { sales: 590, marketCount: 4 },
+    thisMonth:  { sales: 720, marketCount: 5 },
+    nextMonth:  { sales: 840, marketCount: 5 },
+    reels:      { lastMonth: 42000, thisMonth: 56000 },
+  },
+  '김영은': {
+    ytdSales: 2120,
+    lastMonth:  { sales: 410, marketCount: 3 },
+    thisMonth:  { sales: 480, marketCount: 5 },
+    nextMonth:  { sales: 550, marketCount: 5 },
+    reels:      { lastMonth: 38000, thisMonth: 35000 },
+  },
+  '모노마켓': {
+    ytdSales: 1680,
+    lastMonth:  { sales: 320, marketCount: 3 },
+    thisMonth:  { sales: 390, marketCount: 4 },
+    nextMonth:  { sales: 450, marketCount: 4 },
+    reels:      { lastMonth: 28000, thisMonth: 41000 },
+  },
+  '풀킴': {
+    ytdSales: 1240,
+    lastMonth:  { sales: 220, marketCount: 2 },
+    thisMonth:  { sales: 290, marketCount: 3 },
+    nextMonth:  { sales: 360, marketCount: 4 },
+    reels:      { lastMonth: 22000, thisMonth: 31000 },
+  },
+};
+const BRAND_NAMES =['동국제약','오로바일렌','퓨어레비','드시모네','허그베어','테코야','블랙홀 코팅큐','디귿','트루티','트루쿡','씨밀렉스','신일','코닥','VDL','로라애슐리','메디힐','풀무원','나무엑스','경자국밥','콤비타'];
 
 // 브랜드 메타 (담당자 + 거래형태)
 const PRODUCT_MGR_NAMES = ['정연수', '김규민', '박준호', '이호영', '김소리'];
@@ -549,45 +597,32 @@ function PartnerBadge() {
 
 // ─────────────── 🤝 파트너 셀러 섹션 ───────────────
 function PartnerSellersSection() {
-  const partnerNames = Object.keys(PARTNER_SELLERS);
-
-  // 마켓 데이터로부터 파트너별 누적 매출/주문 집계
-  const stats = useMemo(() => {
-    const map = new Map();
-    for (const m of MARKETS) {
-      if (!PARTNER_SELLERS[m.sellerName]) continue;
-      const cur = map.get(m.sellerName) || {
-        name: m.sellerName,
-        sales: 0, orderCount: 0, marketCount: 0, csIssues: 0,
-        managerName: m.managerName,
-      };
-      cur.sales += m.sales;
-      cur.orderCount += m.orderCount;
-      cur.csIssues += m.csIssues;
-      cur.marketCount += 1;
-      map.set(m.sellerName, cur);
-    }
-    // PARTNER_SELLERS 순서대로 정렬, 매출 큰 순
-    const arr = partnerNames.map(name => map.get(name) || {
-      name, sales: 0, orderCount: 0, marketCount: 0, csIssues: 0, managerName: MGR_OF_SELLER[name] || '-',
-    });
-    return arr.sort((a, b) => b.sales - a.sales);
-  }, []);
+  // 누적매출 큰 순으로 정렬
+  const sorted = Object.keys(PARTNER_SELLERS)
+    .map(name => ({ name, ...PARTNER_STATS[name] }))
+    .sort((a, b) => b.ytdSales - a.ytdSales);
 
   return (
     <div style={card}>
       <SectionTitle
         emoji="🤝"
         title="와이어드 파트너 셀러"
-        hint="노션 '🎁 와이어드 파트너' 페이지에 등록된 6명 · 카드 클릭 → 해당 파트너 노션 페이지로 이동"
+        hint="2026년 누적매출 + 월별(저번달/이번달/다음달) 매출·마켓·릴스 조회수 · 카드 클릭 → 해당 파트너 노션 페이지"
       />
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14,
       }}>
-        {stats.map((p, i) => {
+        {sorted.map((p, i) => {
           const partner = PARTNER_SELLERS[p.name];
-          const csRate = p.orderCount > 0 ? (p.csIssues / p.orderCount) * 100 : 0;
-          const csColor = csRate < 3 ? '#10b981' : csRate < 7 ? '#f59e0b' : '#ef4444';
+          const isTop = i === 0;
+
+          // 월간 매출 증감
+          const monthDelta = p.lastMonth.sales > 0
+            ? ((p.thisMonth.sales - p.lastMonth.sales) / p.lastMonth.sales) * 100 : 0;
+          // 릴스 조회수 증감
+          const reelsDelta = p.reels.lastMonth > 0
+            ? ((p.reels.thisMonth - p.reels.lastMonth) / p.reels.lastMonth) * 100 : 0;
+
           return (
             <a
               key={p.name}
@@ -596,54 +631,142 @@ function PartnerSellersSection() {
               rel="noopener noreferrer"
               style={{
                 display: 'block', textDecoration: 'none', color: 'inherit',
-                padding: 14, background: i === 0 ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : '#faf9f6',
-                border: '1px solid ' + (i === 0 ? '#fcd34d' : '#e7e3da'),
-                borderRadius: 10, transition: 'transform 0.1s',
+                padding: 16,
+                background: isTop ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : '#faf9f6',
+                border: '1px solid ' + (isTop ? '#fcd34d' : '#e7e3da'),
+                borderRadius: 12, transition: 'transform 0.1s, box-shadow 0.1s',
               }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              {/* 헤더: 이름 + 노션 링크 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {i === 0 && <span style={{ fontSize: 14 }}>🥇</span>}
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#37352f' }}>{p.name}</span>
+                  {isTop && <span style={{ fontSize: 16 }}>🥇</span>}
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#37352f' }}>{p.name}</span>
                 </div>
-                <span style={{ fontSize: 10, color: '#a47148', fontWeight: 600 }}>노션 ↗</span>
+                <span style={{ fontSize: 11, color: '#a47148', fontWeight: 600 }}>노션 ↗</span>
               </div>
-              <div style={{ fontSize: 11, color: '#6b6b6b', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#6b6b6b', marginBottom: 12 }}>
                 {partner.notionTitle}
               </div>
+
+              {/* 누적매출 (강조) */}
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
-                paddingTop: 10, borderTop: '1px solid #e7e3da', fontSize: 11,
+                padding: '10px 12px', marginBottom: 12,
+                background: '#fff', borderRadius: 8,
+                border: '1px solid ' + (isTop ? '#fcd34d' : '#e7e3da'),
               }}>
-                <div>
-                  <div style={{ color: '#6b6b6b' }}>💰 매출</div>
-                  <div style={{ fontWeight: 700, color: '#37352f', fontSize: 13 }}>{fmt(p.sales)}</div>
-                </div>
-                <div>
-                  <div style={{ color: '#6b6b6b' }}>🛒 마켓</div>
-                  <div style={{ fontWeight: 700, color: '#37352f', fontSize: 13 }}>{p.marketCount}건</div>
-                </div>
-                <div>
-                  <div style={{ color: '#6b6b6b' }}>📦 주문</div>
-                  <div style={{ fontWeight: 600, color: '#37352f' }}>{p.orderCount.toLocaleString('ko-KR')}건</div>
-                </div>
-                <div>
-                  <div style={{ color: '#6b6b6b' }}>🎧 CS율</div>
-                  <div style={{ fontWeight: 700, color: csColor }}>{csRate.toFixed(1)}%</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600 }}>💰 2026년 누적매출</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#37352f' }}>
+                    {p.ytdSales.toLocaleString('ko-KR')}
+                    <span style={{ fontSize: 11, fontWeight: 500, color: '#6b6b6b', marginLeft: 2 }}>백만원</span>
+                  </div>
                 </div>
               </div>
-              <div style={{
-                marginTop: 10, paddingTop: 8, borderTop: '1px solid #e7e3da',
-                fontSize: 11, color: '#6b6b6b',
-              }}>
-                담당 <strong style={{ color: '#37352f' }}>{p.managerName}</strong>
+
+              {/* 매출: 저번달 / 이번달 / 다음달 */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600, marginBottom: 4 }}>
+                  💵 매출
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, fontWeight: 700,
+                    color: monthDelta >= 0 ? '#10b981' : '#ef4444',
+                  }}>
+                    {monthDelta >= 0 ? '▲' : '▼'} {Math.abs(monthDelta).toFixed(0)}% (전월대비)
+                  </span>
+                </div>
+                <MonthRow
+                  lastLabel="4월"   lastValue={`${p.lastMonth.sales.toLocaleString('ko-KR')}M`}
+                  thisLabel="5월"   thisValue={`${p.thisMonth.sales.toLocaleString('ko-KR')}M`}
+                  nextLabel="6월(예상)" nextValue={`${p.nextMonth.sales.toLocaleString('ko-KR')}M`}
+                  highlight="this"
+                />
+              </div>
+
+              {/* 마켓 건수: 저번달 / 이번달 / 다음달 */}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600, marginBottom: 4 }}>
+                  🛒 마켓
+                </div>
+                <MonthRow
+                  lastLabel="4월"   lastValue={`${p.lastMonth.marketCount}건`}
+                  thisLabel="5월"   thisValue={`${p.thisMonth.marketCount}건`}
+                  nextLabel="6월"   nextValue={`${p.nextMonth.marketCount}건`}
+                  highlight="this"
+                />
+              </div>
+
+              {/* 컨텐츠 반응: 저번달 / 이번달 릴스 평균 조회수 */}
+              <div>
+                <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600, marginBottom: 4 }}>
+                  🎬 컨텐츠 반응 (릴스 평균 조회수)
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, fontWeight: 700,
+                    color: reelsDelta >= 0 ? '#10b981' : '#ef4444',
+                  }}>
+                    {reelsDelta >= 0 ? '▲' : '▼'} {Math.abs(reelsDelta).toFixed(0)}%
+                  </span>
+                </div>
+                <MonthRow
+                  lastLabel="4월"   lastValue={`${(p.reels.lastMonth / 1000).toFixed(0)}K`}
+                  thisLabel="5월"   thisValue={`${(p.reels.thisMonth / 1000).toFixed(0)}K`}
+                  highlight="this"
+                />
               </div>
             </a>
           );
         })}
       </div>
+
+      <div style={{
+        marginTop: 14, padding: 10, background: '#fffbeb', borderRadius: 8,
+        fontSize: 11, color: '#78350f',
+      }}>
+        ℹ️ <strong>담당자 표시는 보류</strong> — 셀러별 담당자가 여러 명이라 추후 명세 후 추가 예정
+      </div>
+    </div>
+  );
+}
+
+// 월별 비교 행 (저번달 / 이번달 / 다음달)
+function MonthRow({ lastLabel, lastValue, thisLabel, thisValue, nextLabel, nextValue, highlight }) {
+  const cells = [
+    { label: lastLabel, value: lastValue, key: 'last' },
+    { label: thisLabel, value: thisValue, key: 'this' },
+  ];
+  if (nextLabel) cells.push({ label: nextLabel, value: nextValue, key: 'next' });
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: `repeat(${cells.length}, 1fr)`, gap: 6,
+    }}>
+      {cells.map(c => {
+        const isHi = highlight === c.key;
+        const isNext = c.key === 'next';
+        return (
+          <div key={c.key} style={{
+            padding: '6px 8px',
+            background: isHi ? '#fff' : 'transparent',
+            border: '1px solid ' + (isHi ? '#fcd34d' : '#e7e3da'),
+            borderStyle: isNext ? 'dashed' : 'solid',
+            borderRadius: 6, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 10, color: isNext ? '#a47148' : '#6b6b6b' }}>{c.label}</div>
+            <div style={{
+              fontSize: 13, fontWeight: isHi ? 700 : 600,
+              color: isNext ? '#a47148' : '#37352f',
+            }}>{c.value}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
