@@ -44,13 +44,13 @@ export default function PreviewLayout({ children }) {
   if (!session) return <LoginScreen />;
 
   return (
-    <div style={{ background: '#f9fafb', minHeight: '100vh' }}>
+    <div style={{ background: '#f1f5f9', minHeight: '100vh' }}>
       {/* 탭 네비게이션 */}
       <nav style={{
         background: '#fff',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '1px solid #cbd5e1',
         position: 'sticky', top: 0, zIndex: 50,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        boxShadow: '0 1px 3px rgba(15,23,42,0.05)',
       }}>
         <div style={{
           maxWidth: 1280, margin: '0 auto', padding: '0 24px',

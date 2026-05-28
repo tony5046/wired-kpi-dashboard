@@ -12,21 +12,46 @@ const MANAGERS = [...new Set(ALL_SELLERS.map(s => s.manager))].sort();
 
 const sum = (arr) => arr.reduce((a, v) => a + v, 0);
 
-// ─── 컬러 시스템 (한 가지 액센트) ───
+// ─── 컬러 시스템 (구조감 강화) ───
 const C = {
-  indigo:     '#4f46e5',
-  indigoSoft:'#eef2ff',
-  indigoMid: '#c7d2fe',
-  emerald:    '#059669',
-  emeraldSoft:'#ecfdf5',
-  amber:      '#d97706',
-  amberSoft:  '#fffbeb',
-  rose:       '#dc2626',
-  ink:        '#0f172a',
-  muted:      '#64748b',
-  faint:      '#94a3b8',
-  divider:    '#e2e8f0',
-  bg:         '#f8fafc',
+  // 액센트
+  indigo:      '#4f46e5',
+  indigoSoft:  '#eef2ff',
+  indigoMid:   '#c7d2fe',
+  indigoDark:  '#3730a3',
+
+  // 상태
+  emerald:     '#059669',
+  emeraldSoft: '#d1fae5',
+  amber:       '#d97706',
+  amberSoft:   '#fef3c7',
+  rose:        '#dc2626',
+
+  // 텍스트
+  ink:         '#0f172a',
+  muted:       '#475569',
+  faint:       '#94a3b8',
+
+  // 표면 / 선
+  pageBg:      '#f1f5f9',  // 페이지 배경 (slate-100)
+  surface:     '#fff',
+  surfaceMuted:'#f8fafc',  // 테이블 헤더 / 약한 배경
+  zebra:       '#fcfdfe',  // 짝수 행 (아주 옅은)
+  divider:     '#cbd5e1',  // 메인 구분선 (좀 진하게)
+  dividerSoft: '#e2e8f0',  // 가벼운 구분선
+  dividerBold: '#94a3b8',  // 강조 구분선
+
+  // 그림자
+  shadow:      '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
+  shadowMd:    '0 4px 12px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04)',
+};
+
+// 공통 카드 스타일
+const cardStyle = {
+  background: C.surface,
+  border: `1px solid ${C.divider}`,
+  borderRadius: 12,
+  boxShadow: C.shadow,
 };
 
 // 달성률 색상 (4단계 아님 — 3단계)
@@ -59,9 +84,8 @@ function PageHeader({ sellers }) {
       {/* 통계 스트립 — 인디고 강조 */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
-        padding: 0, marginBottom: 16,
-        background: '#fff', border: `1px solid ${C.divider}`, borderRadius: 12,
-        overflow: 'hidden',
+        marginBottom: 16, overflow: 'hidden',
+        ...cardStyle,
       }}>
         <Stat label="관리 셀러" value={`${sellers.length}`} unit="곳" />
         <Stat label="누적 목표" value={`${totalT.toLocaleString()}`} unit="백만원" />
@@ -84,13 +108,12 @@ function ManagerFilter({ managerFilter, setManagerFilter, partnerOnly, setPartne
 
   return (
     <div style={{
-      display: 'flex', gap: 10, marginBottom: 16, padding: '12px 14px',
-      background: '#fff', border: `1px solid ${C.divider}`, borderRadius: 10,
+      display: 'flex', gap: 10, marginBottom: 16, padding: '14px 16px',
       alignItems: 'center', flexWrap: 'wrap',
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+      ...cardStyle,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>담당자</span>
+        <span style={{ fontSize: 12, color: C.muted, fontWeight: 700, marginRight: 4 }}>담당자</span>
         <Chip active={managerFilter === 'all'} onClick={() => setManagerFilter('all')}>
           전체 ({totalCount})
         </Chip>
@@ -100,7 +123,7 @@ function ManagerFilter({ managerFilter, setManagerFilter, partnerOnly, setPartne
           </Chip>
         ))}
       </div>
-      <div style={{ width: 1, height: 22, background: C.divider }} />
+      <div style={{ width: 1, height: 24, background: C.divider }} />
       <Chip active={partnerOnly} onClick={() => setPartnerOnly(!partnerOnly)} accent>
         🤝 파트너만 ({partnerCount})
       </Chip>
@@ -126,13 +149,13 @@ function Chip({ active, onClick, children, accent }) {
 function Stat({ label, value, unit, accent, accentColor, bg }) {
   return (
     <div style={{
-      padding: '14px 18px',
-      borderRight: `1px solid ${C.divider}`,
-      background: bg || '#fff',
+      padding: '16px 20px',
+      borderRight: `1px solid ${C.dividerSoft}`,
+      background: bg || C.surface,
     }}>
-      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 11, color: C.muted, marginBottom: 6, fontWeight: 600, letterSpacing: '0.02em' }}>{label}</div>
       <div style={{
-        fontSize: 20, fontWeight: 700,
+        fontSize: 22, fontWeight: 700,
         color: accentColor || (accent ? C.indigo : C.ink),
         letterSpacing: '-0.02em',
       }}>
@@ -160,16 +183,18 @@ function DesignA({ sellers }) {
   const [expanded, setExpanded] = useState(null);
 
   const th = {
-    padding: '12px 8px',
-    borderBottom: `2px solid ${C.divider}`,
-    fontSize: 11, color: C.muted, fontWeight: 600,
+    padding: '14px 8px',
+    borderBottom: `2px solid ${C.dividerBold}`,
+    background: C.surfaceMuted,
+    fontSize: 11, color: C.muted, fontWeight: 700,
     textAlign: 'center', whiteSpace: 'nowrap',
+    letterSpacing: '0.04em',
   };
   const thLeft = { ...th, textAlign: 'left' };
-  const td = { padding: '10px 8px', fontSize: 13, color: C.ink, borderBottom: `1px solid #f1f5f9` };
+  const td = { padding: '12px 8px', fontSize: 13, color: C.ink, borderBottom: `1px solid ${C.dividerSoft}` };
   const cellNum = {
-    padding: '8px', textAlign: 'center',
-    fontSize: 13, borderBottom: `1px solid #f1f5f9`,
+    padding: '10px 8px', textAlign: 'center',
+    fontSize: 13, borderBottom: `1px solid ${C.dividerSoft}`,
   };
 
   const grandT = new Array(MONTHS.length).fill(0);
@@ -183,20 +208,23 @@ function DesignA({ sellers }) {
   const grandRate = sum(grandT) > 0 ? (sum(grandA) / sum(grandT)) * 100 : 0;
 
   return (
-    <div style={{
-      padding: 20, background: '#fff',
-      border: `1px solid ${C.divider}`, borderRadius: 12,
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
-    }}>
+    <div style={{ ...cardStyle, overflow: 'hidden' }}>
+      {/* 섹션 헤더 (테이블 위) */}
       <div style={{
-        padding: '8px 12px', marginBottom: 10, background: C.indigoSoft,
-        border: `1px solid ${C.indigoMid}`, borderRadius: 6,
-        fontSize: 12, color: C.indigo, fontWeight: 500,
+        padding: '14px 20px',
+        background: C.surfaceMuted,
+        borderBottom: `1px solid ${C.divider}`,
+        display: 'flex', alignItems: 'center', gap: 8,
       }}>
-        💡 셀러 행을 클릭하면 월별로 진행한/예정인 마켓 상세가 펼쳐져요 (실제매출 · 영업이익 · 예상매출)
+        <div style={{ width: 4, height: 18, background: C.indigo, borderRadius: 2 }} />
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>셀러별 월별 목표 vs 실적</div>
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 11, color: C.muted }}>
+          💡 셀러 행 클릭 → 마켓 상세 펼침
+        </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', padding: '0 4px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
@@ -320,18 +348,27 @@ function DesignA({ sellers }) {
 // 셀러 펼친 영역: 월별 마켓 상세
 function MarketDetail({ seller }) {
   return (
-    <div style={{ padding: '14px 20px 20px' }}>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>
+    <div style={{
+      padding: '16px 20px 20px',
+      background: C.surfaceMuted,
+      borderTop: `1px solid ${C.divider}`,
+    }}>
+      <div style={{
+        fontSize: 12, color: C.muted, marginBottom: 12, fontWeight: 700,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <div style={{ width: 3, height: 14, background: C.indigo, borderRadius: 2 }} />
         📋 {seller.name} 마켓 진행 내역
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {MONTHS.map((monthLabel, mIdx) => {
           const markets = seller.marketsByMonth[mIdx] || [];
           const isCompleted = COMPLETED_MONTHS.has(mIdx);
           return (
             <div key={monthLabel} style={{
-              padding: 12, background: '#fff',
-              border: `1px solid ${C.divider}`, borderRadius: 8,
+              padding: 14, background: '#fff',
+              border: `1px solid ${C.divider}`, borderRadius: 10,
+              boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -409,10 +446,18 @@ function DesignB({ sellers }) {
 
         return (
           <div key={s.name} style={{
-            padding: 20, background: '#fff',
-            border: `1px solid ${C.divider}`, borderRadius: 12,
-            boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+            ...cardStyle,
+            overflow: 'hidden',
           }}>
+            <div style={{
+              padding: '10px 18px', background: C.surfaceMuted,
+              borderBottom: `1px solid ${C.dividerSoft}`,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <div style={{ width: 3, height: 14, background: C.indigo, borderRadius: 2 }} />
+              <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: '0.04em' }}>SELLER · {s.manager}</div>
+            </div>
+            <div style={{ padding: 18 }}>
             {/* 상단: 이름 + 달성률 큰 박스 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
@@ -505,6 +550,7 @@ function DesignB({ sellers }) {
                 실적 (달성률 색)
               </div>
             </div>
+            </div>
           </div>
         );
       })}
@@ -517,12 +563,17 @@ function DesignB({ sellers }) {
 // ============================================================
 function DesignC({ sellers }) {
   return (
-    <div style={{
-      padding: 20, background: '#fff',
-      border: `1px solid ${C.divider}`, borderRadius: 12,
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
-    }}>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ ...cardStyle, overflow: 'hidden' }}>
+      <div style={{
+        padding: '14px 20px',
+        background: C.surfaceMuted,
+        borderBottom: `1px solid ${C.divider}`,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <div style={{ width: 4, height: 18, background: C.indigo, borderRadius: 2 }} />
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>월별 추이 — 라인 비교</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: '200px 90px 1fr 80px 80px 90px',
@@ -573,8 +624,8 @@ function DesignC({ sellers }) {
               fontSize: 13,
               transition: 'background 0.15s',
             }}
-              onMouseEnter={(e) => e.currentTarget.style.background = C.bg}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+              onMouseEnter={(e) => e.currentTarget.style.background = C.surfaceMuted}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               <div>
                 <div style={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>
@@ -628,7 +679,7 @@ function DesignC({ sellers }) {
       </div>
 
       {/* 범례 */}
-      <div style={{ display: 'flex', gap: 20, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.divider}`, fontSize: 11, color: C.muted, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 20, padding: '14px 20px', borderTop: `1px solid ${C.divider}`, background: C.surfaceMuted, fontSize: 11, color: C.muted, justifyContent: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke={C.faint} strokeWidth="1.5" strokeDasharray="3,3" /></svg>
           목표
@@ -685,12 +736,11 @@ export default function SellersPage() {
       {/* 디자인 선택 */}
       <div style={{
         display: 'flex', gap: 6, marginBottom: 16,
-        padding: '10px 14px', background: '#fff',
-        border: `1px solid ${C.divider}`, borderRadius: 10,
+        padding: '12px 16px',
         alignItems: 'center',
-        boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+        ...cardStyle,
       }}>
-        <span style={{ fontSize: 12, color: C.muted, marginRight: 8, fontWeight: 600 }}>디자인 비교:</span>
+        <span style={{ fontSize: 12, color: C.muted, marginRight: 8, fontWeight: 700, letterSpacing: '0.02em' }}>디자인 비교</span>
         {[
           { k: 'A', label: 'A · 테이블 + 마켓 펼침' },
           { k: 'B', label: 'B · 카드 + 막대' },

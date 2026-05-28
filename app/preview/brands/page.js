@@ -7,44 +7,69 @@ const BRANDS_MOCK = MOCK_BRAND_MGMT.brands;
 
 const sum = (arr) => arr.reduce((a, v) => a + v, 0);
 
-// ─────────────── 스타일 (미니멀) ───────────────
-const card = {
-  padding: 20,
-  background: '#fff',
-  border: '1px solid #e5e7eb',
-  borderRadius: 10,
+// ─────────────── 스타일 ───────────────
+const C = {
+  indigo:      '#4f46e5',
+  indigoSoft:  '#eef2ff',
+  indigoMid:   '#c7d2fe',
+  ink:         '#0f172a',
+  muted:       '#475569',
+  faint:       '#94a3b8',
+  surface:     '#fff',
+  surfaceMuted:'#f8fafc',
+  divider:     '#cbd5e1',
+  dividerSoft: '#e2e8f0',
+  dividerBold: '#94a3b8',
 };
+const card = {
+  background: C.surface,
+  border: `1px solid ${C.divider}`,
+  borderRadius: 12,
+  boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
+  overflow: 'hidden',
+};
+const cardHeader = {
+  padding: '14px 20px',
+  background: C.surfaceMuted,
+  borderBottom: `1px solid ${C.divider}`,
+  display: 'flex', alignItems: 'center', gap: 8,
+};
+const cardBody = { padding: 20 };
+
 const th = {
-  padding: '10px 8px',
-  borderBottom: '1px solid #d1d5db',
+  padding: '14px 8px',
+  borderBottom: `2px solid ${C.dividerBold}`,
+  background: C.surfaceMuted,
   fontSize: 11,
-  color: '#6b7280',
-  fontWeight: 600,
+  color: C.muted,
+  fontWeight: 700,
   textAlign: 'center',
   whiteSpace: 'nowrap',
+  letterSpacing: '0.04em',
 };
 const thLeft = { ...th, textAlign: 'left' };
 const td = {
-  padding: '8px',
+  padding: '12px 8px',
   fontSize: 13,
-  color: '#374151',
-  borderBottom: '1px solid #f3f4f6',
+  color: C.ink,
+  borderBottom: `1px solid ${C.dividerSoft}`,
 };
 const cellNum = {
-  padding: '6px 8px',
+  padding: '10px 8px',
   textAlign: 'center',
   fontSize: 13,
-  color: '#374151',
-  borderBottom: '1px solid #f3f4f6',
+  color: C.ink,
+  borderBottom: `1px solid ${C.dividerSoft}`,
 };
 
 // ─────────────── 컴포넌트 ───────────────
-function SectionTitle({ title, hint, action }) {
+function CardHeader({ title, hint, action }) {
   return (
-    <div style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-      <div>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#111' }}>{title}</h2>
-        {hint && <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>{hint}</p>}
+    <div style={cardHeader}>
+      <div style={{ width: 4, height: 18, background: C.indigo, borderRadius: 2 }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{title}</div>
+        {hint && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{hint}</div>}
       </div>
       {action}
     </div>
@@ -54,11 +79,11 @@ function SectionTitle({ title, hint, action }) {
 function ToggleBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
-      padding: '6px 12px', fontSize: 12,
-      fontWeight: active ? 600 : 400,
-      background: active ? '#111' : '#fff',
-      color: active ? '#fff' : '#6b7280',
-      border: '1px solid ' + (active ? '#111' : '#d1d5db'),
+      padding: '7px 14px', fontSize: 12,
+      fontWeight: active ? 700 : 500,
+      background: active ? C.indigo : C.surface,
+      color: active ? '#fff' : C.muted,
+      border: '1px solid ' + (active ? C.indigo : C.divider),
       borderRadius: 6, cursor: 'pointer',
     }}>{children}</button>
   );
@@ -145,10 +170,10 @@ export default function BrandsPage() {
         </p>
       </header>
 
-      {/* 한 줄 요약 — 카드 대신 텍스트 */}
+      {/* 한 줄 요약 */}
       <div style={{
-        display: 'flex', gap: 32, padding: '12px 16px', marginBottom: 16,
-        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+        display: 'flex', gap: 32, padding: '14px 18px', marginBottom: 16,
+        ...card,
         fontSize: 13,
       }}>
         <Stat label="관리 브랜드" value={`${BRANDS_MOCK.length}개`} />
@@ -159,7 +184,7 @@ export default function BrandsPage() {
 
       {/* 테이블 1: 브랜드별 */}
       <div style={{ ...card, marginBottom: 16 }}>
-        <SectionTitle title="브랜드별 월별 목표 vs 실적" />
+        <CardHeader title="브랜드별 월별 목표 vs 실적" />
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -170,13 +195,13 @@ export default function BrandsPage() {
                 <th style={thLeft}>관리</th>
                 <th style={th}>구분</th>
                 {MONTHS.map(m => <th key={m} style={{ ...th, minWidth: 50 }}>{m}</th>)}
-                <th style={{ ...th, background: '#f9fafb' }}>Total</th>
+                <th style={{ ...th, background: C.indigoSoft }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {BRANDS_MOCK.map((b, i) => (
                 <Fragment key={b.name}>
-                  <tr style={{ borderTop: i > 0 ? '1px solid #e5e7eb' : 'none' }}>
+                  <tr style={{ borderTop: i > 0 ? `1px solid ${C.dividerSoft}` : 'none' }}>
                     <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle', color: '#111' }}>{b.name}</td>
                     <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.discoverer}</td>
                     <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.manager}</td>
@@ -191,16 +216,16 @@ export default function BrandsPage() {
               ))}
 
               {/* Total */}
-              <tr style={{ borderTop: '2px solid #d1d5db', background: '#f9fafb' }}>
-                <td colSpan={3} rowSpan={2} style={{ ...td, fontWeight: 700, textAlign: 'center', color: '#111', verticalAlign: 'middle' }}>
+              <tr style={{ borderTop: `2px solid ${C.indigo}`, background: C.indigoSoft }}>
+                <td colSpan={3} rowSpan={2} style={{ ...td, fontWeight: 700, textAlign: 'center', color: C.indigo, verticalAlign: 'middle', background: C.indigoSoft }}>
                   Total
                 </td>
-                <td style={{ ...cellNum, fontSize: 11, color: '#9ca3af' }}>목표</td>
-                <MonthRow values={grandTargets} muted totalBg="#f3f4f6" />
+                <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 600, background: C.indigoSoft }}>목표</td>
+                <MonthRow values={grandTargets} muted totalBg={C.indigoMid} />
               </tr>
-              <tr style={{ background: '#f9fafb' }}>
-                <td style={{ ...cellNum, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>실적</td>
-                <MonthRow values={grandActuals} bold totalBg="#f3f4f6" />
+              <tr style={{ background: C.indigoSoft }}>
+                <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft }}>실적</td>
+                <MonthRow values={grandActuals} bold totalBg={C.indigoMid} />
               </tr>
             </tbody>
           </table>
@@ -209,7 +234,7 @@ export default function BrandsPage() {
 
       {/* 테이블 2: 담당자별 */}
       <div style={card}>
-        <SectionTitle
+        <CardHeader
           title="담당자별 합계"
           hint="2개 이상 브랜드를 맡은 담당자는 행 클릭 시 펼침"
           action={
@@ -229,7 +254,7 @@ export default function BrandsPage() {
                 <th style={thLeft}>담당 브랜드</th>
                 <th style={th}>구분</th>
                 {MONTHS.map(m => <th key={m} style={{ ...th, minWidth: 50 }}>{m}</th>)}
-                <th style={{ ...th, background: '#f9fafb' }}>Total</th>
+                <th style={{ ...th, background: C.indigoSoft }}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -242,7 +267,7 @@ export default function BrandsPage() {
                     <tr
                       onClick={onClick}
                       style={{
-                        borderTop: i > 0 ? '1px solid #e5e7eb' : 'none',
+                        borderTop: i > 0 ? `1px solid ${C.dividerSoft}` : 'none',
                         cursor: multi ? 'pointer' : 'default',
                       }}
                     >
