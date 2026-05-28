@@ -67,19 +67,12 @@ export async function GET(request) {
     result.tests.markets = { error: e.message, stack: e.stack?.split('\n').slice(0, 3) };
   }
 
-  // Test 3: 다양한 기간으로 테스트해서 어디까지 허용되는지 확인
-  const ranges = [
-    { name: '1개월(5월)', start: '2026-05-01', end: '2026-05-31' },
-    { name: '2개월(4-5월)', start: '2026-04-01', end: '2026-05-31' },
-    { name: '3개월(Q2)', start: '2026-04-01', end: '2026-06-30' },
-    { name: '6개월(상반기)', start: '2026-01-01', end: '2026-06-30' },
-    { name: '12개월(전체)', start: '2026-01-01', end: '2026-12-31' },
-  ];
-
-  for (const r of ranges) {
+  // Test 3: page size 최대값 찾기
+  const sizes = [100, 500, 1000, 2000, 3000, 5000];
+  for (const size of sizes) {
     try {
       const t1 = Date.now();
-      const url = `${base}/order/orders?durationType=CREATED_AT&startDate=${r.start}&endDate=${r.end}&offset=0&size=100`;
+      const url = `${base}/order/orders?durationType=CREATED_AT&startDate=2026-05-01&endDate=2026-05-31&offset=0&size=${size}`;
       const res = await fetch(url, {
         headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
         cache: 'no-store',
@@ -87,16 +80,15 @@ export async function GET(request) {
       const bodyText = await res.text();
       let parsed = null;
       try { parsed = JSON.parse(bodyText); } catch {}
-      result.tests[`range_${r.name}`] = {
+      result.tests[`size_${size}`] = {
         status: res.status,
         timeMs: Date.now() - t1,
         ok: res.ok,
-        pagination: parsed?.pagination,
         dataCount: parsed?.data?.length,
-        errorBody: !res.ok ? bodyText.slice(0, 500) : undefined,
+        errorBody: !res.ok ? bodyText.slice(0, 300) : undefined,
       };
     } catch (e) {
-      result.tests[`range_${r.name}`] = { error: e.message };
+      result.tests[`size_${size}`] = { error: e.message };
     }
   }
 
