@@ -1,7 +1,5 @@
 'use client';
-import Link from 'next/link';
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { useSession, signIn } from 'next-auth/react';
 import ChatWidget from '../chat-widget';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -979,42 +977,12 @@ function ErrorPanel({ message }) {
   );
 }
 
-// ─────────────── 로그인 화면 ───────────────
-function LoginScreen() {
-  return (
-    <main style={{ padding: 40, maxWidth: 480, margin: '80px auto', textAlign: 'center' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-      <h1 style={{ fontSize: 24, margin: 0, marginBottom: 8 }}>로그인이 필요해요</h1>
-      <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 24px' }}>
-        @wired.company 구글 계정으로 로그인하면<br />
-        실시간 매출 대시보드를 볼 수 있어요
-      </p>
-      <button
-        onClick={() => signIn('google')}
-        style={{
-          padding: '14px 28px', fontSize: 15, fontWeight: 600,
-          background: '#4285F4', color: '#fff',
-          border: 'none', borderRadius: 10, cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(66,133,244,0.3)',
-        }}
-      >
-        🔑 Google 계정으로 로그인
-      </button>
-      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 24 }}>
-        와이어드 직원 전용 (@wired.company 도메인만 허용)
-      </div>
-    </main>
-  );
-}
-
 // ─────────────── 메인 ───────────────
 export default function Preview() {
-  const { data: session, status } = useSession();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!session) return; // 로그인 안 했으면 데이터 fetch 안 함
     fetch('/api/preview-data')
       .then(r => r.json())
       .then(d => {
@@ -1022,28 +990,15 @@ export default function Preview() {
         else setData(d);
       })
       .catch(e => setError(e.message));
-  }, [session]);
-
-  // 세션 로딩 중
-  if (status === 'loading') {
-    return (
-      <main style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-        세션 확인 중...
-      </main>
-    );
-  }
-
-  // 로그인 안 된 상태
-  if (!session) return <LoginScreen />;
+  }, []);
 
   return (
-    <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto', background: '#f9fafb', minHeight: '100vh' }}>
+    <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, margin: 0 }}>📊 와이어드 매출 대시보드 v5 — 실데이터</h1>
+        <h1 style={{ fontSize: 22, margin: 0 }}>📊 매출 현황</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
           매출 = <strong>와이어드 매출 (totalWiredSalesAmount)</strong> · 지난 달까지는 사업개발 시트 (정산 기준 확정값) · <strong style={{ color: '#2563eb' }}>이번 달은 와이어드민 실시간</strong>
         </p>
-        <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 기존 페이지로</Link>
       </header>
 
       {error && <ErrorPanel message={error} />}
