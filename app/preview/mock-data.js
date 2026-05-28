@@ -203,6 +203,12 @@ export const MOCK_BRANDS = (() => {
 })();
 
 // ─── 브랜드 관리 페이지: 월별 목표 vs 실적 ───
+// 다중 브랜드 케이스 시연용 데이터:
+//   • 홍만의 발굴: 멜리언스 + 셀라보드 + 더모비 (3개)
+//   • 정석호 관리: 멜리언스 + 셀라보드 (2개)
+//   • 박준호 관리: 오마뎅 + 더모비 (2개)
+//   • 김규민 발굴: 씨밀렉스 + 디카페인 (2개), 관리: 금왕 (1개)
+//   • 강규성 관리: 올레아 + 디카페인 (2개), 발굴: 금왕 (1개)
 export const MOCK_BRAND_MGMT = {
   months: ['5월', '6월', '7월', '8월', '9월', '10월'],
   brands: [
@@ -211,6 +217,10 @@ export const MOCK_BRAND_MGMT = {
     { name: '씨밀렉스', discoverer: '김규민', manager: '이민우', targets: [10,10,10,10,10,10], actuals: [11, 4,21,10, 5, 1] },
     { name: '금왕',     discoverer: '강규성', manager: '김규민', targets: [20,20,20,20,20,20], actuals: [10,20,30, 4, 5, 6] },
     { name: '올레아',   discoverer: '박준호', manager: '강규성', targets: [10,10,10,10,10,10], actuals: [11,12,13,14,15,16] },
+    // ↓ 다중 브랜드 케이스 시연용 추가
+    { name: '셀라보드', discoverer: '홍만의', manager: '정석호', targets: [15,15,15,15,15,15], actuals: [ 3, 5, 8,12,15,18] },
+    { name: '더모비',   discoverer: '홍만의', manager: '박준호', targets: [10,10,10,10,10,10], actuals: [ 2, 4, 7, 9,11,13] },
+    { name: '디카페인', discoverer: '김규민', manager: '강규성', targets: [15,15,15,15,15,15], actuals: [ 5, 8,12,15,18,20] },
   ],
 };
 

@@ -108,8 +108,15 @@ function MonthRow({ values, isActual, targets, totalBg = '#eff6ff' }) {
 // ─────────────── 메인 ───────────────
 export default function BrandsPage() {
   const [managerMode, setManagerMode] = useState('discoverer'); // 'discoverer' | 'manager'
+  const [expandedMgr, setExpandedMgr] = useState(null); // 펼친 담당자 이름
 
-  // 담당자별 집계
+  // 담당자 모드 바뀌면 펼침 초기화
+  function switchMode(mode) {
+    setManagerMode(mode);
+    setExpandedMgr(null);
+  }
+
+  // 담당자별 집계 — brandDetails로 각 브랜드별 세부 추적
   const byManager = useMemo(() => {
     const map = new Map();
     for (const b of BRANDS_MOCK) {
@@ -120,12 +127,18 @@ export default function BrandsPage() {
         targets: new Array(MONTHS.length).fill(0),
         actuals: new Array(MONTHS.length).fill(0),
         brands: [],
+        brandDetails: [],   // [{ name, targets, actuals }]
       };
       for (let i = 0; i < MONTHS.length; i++) {
         cur.targets[i] += b.targets[i];
         cur.actuals[i] += b.actuals[i];
       }
       cur.brands.push(b.name);
+      cur.brandDetails.push({
+        name: b.name,
+        targets: b.targets,
+        actuals: b.actuals,
+      });
       map.set(key, cur);
     }
     return [...map.values()].sort((a, b) => sum(b.actuals) - sum(a.actuals));
@@ -232,20 +245,29 @@ export default function BrandsPage() {
           hint="각 담당자가 맡은 브랜드들의 목표 / 실적 합산"
           action={
             <div style={{ display: 'flex', gap: 6 }}>
-              <ToggleBtn active={managerMode === 'discoverer'} onClick={() => setManagerMode('discoverer')}>
+              <ToggleBtn active={managerMode === 'discoverer'} onClick={() => switchMode('discoverer')}>
                 🔍 발굴 담당자
               </ToggleBtn>
-              <ToggleBtn active={managerMode === 'manager'} onClick={() => setManagerMode('manager')}>
+              <ToggleBtn active={managerMode === 'manager'} onClick={() => switchMode('manager')}>
                 📋 관리 담당자
               </ToggleBtn>
             </div>
           }
         />
 
+        <div style={{
+          padding: '8px 12px', marginBottom: 8, background: '#fffbeb',
+          border: '1px solid #fde68a', borderRadius: 6,
+          fontSize: 12, color: '#78350f',
+        }}>
+          💡 <strong>2개 이상 브랜드</strong>를 맡은 담당자는 행 클릭 시 브랜드별 내역이 펼쳐져요
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
+                <th style={{ ...th, width: 28 }}></th>
                 <th style={th}>{managerMode === 'discoverer' ? '발굴' : '관리'} 담당자</th>
                 <th style={th}>담당 브랜드</th>
                 <th style={{ ...th, textAlign: 'center' }}>구분</th>
@@ -256,23 +278,78 @@ export default function BrandsPage() {
               </tr>
             </thead>
             <tbody>
-              {byManager.map((mgr, i) => (
-                <Fragment key={mgr.name}>
-                  <tr style={{ borderTop: i > 0 ? '2px solid #e5e7eb' : 'none' }}>
-                    <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{mgr.name}</td>
-                    <td rowSpan={2} style={{ ...td, fontSize: 11, color: '#6b7280', verticalAlign: 'middle' }}>
-                      <div>{mgr.brands.join(', ')}</div>
-                      <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{mgr.brands.length}개 브랜드</div>
-                    </td>
-                    <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>목표</td>
-                    <MonthRow values={mgr.targets} isActual={false} targets={mgr.targets} />
-                  </tr>
-                  <tr>
-                    <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
-                    <MonthRow values={mgr.actuals} isActual={true} targets={mgr.targets} />
-                  </tr>
-                </Fragment>
-              ))}
+              {byManager.map((mgr, i) => {
+                const hasMultiple = mgr.brands.length >= 2;
+                const isExpanded = expandedMgr === mgr.name;
+                const onClick = hasMultiple
+                  ? () => setExpandedMgr(isExpanded ? null : mgr.name)
+                  : undefined;
+                return (
+                  <Fragment key={mgr.name}>
+                    {/* 담당자 요약 행 (목표) */}
+                    <tr
+                      onClick={onClick}
+                      style={{
+                        borderTop: i > 0 ? '2px solid #e5e7eb' : 'none',
+                        cursor: hasMultiple ? 'pointer' : 'default',
+                        background: isExpanded ? '#eff6ff' : 'transparent',
+                      }}
+                    >
+                      <td rowSpan={2} style={{ ...td, textAlign: 'center', color: '#9ca3af', verticalAlign: 'middle' }}>
+                        {hasMultiple ? (isExpanded ? '▼' : '▶') : ''}
+                      </td>
+                      <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{mgr.name}</td>
+                      <td rowSpan={2} style={{ ...td, fontSize: 11, color: '#6b7280', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span>{mgr.brands.join(', ')}</span>
+                          {hasMultiple && (
+                            <span style={{
+                              fontSize: 10, padding: '2px 6px', borderRadius: 8,
+                              background: '#dbeafe', color: '#1e40af', fontWeight: 700,
+                            }}>+{mgr.brands.length - 1}</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{mgr.brands.length}개 브랜드</div>
+                      </td>
+                      <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 700, background: '#f9fafb' }}>합계 (목표)</td>
+                      <MonthRow values={mgr.targets} isActual={false} targets={mgr.targets} />
+                    </tr>
+                    <tr
+                      onClick={onClick}
+                      style={{
+                        cursor: hasMultiple ? 'pointer' : 'default',
+                        background: isExpanded ? '#eff6ff' : 'transparent',
+                      }}
+                    >
+                      <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700, background: '#f9fafb' }}>합계 (실적)</td>
+                      <MonthRow values={mgr.actuals} isActual={true} targets={mgr.targets} />
+                    </tr>
+
+                    {/* 펼쳐진 브랜드별 행 */}
+                    {isExpanded && mgr.brandDetails.map((bd, bi) => (
+                      <Fragment key={`${mgr.name}-${bd.name}`}>
+                        <tr style={{ background: '#fafbfc', borderTop: bi === 0 ? '1px dashed #93c5fd' : '1px solid #f3f4f6' }}>
+                          <td></td>
+                          <td colSpan={2} rowSpan={2} style={{
+                            ...td, fontSize: 12, color: '#374151', verticalAlign: 'middle',
+                            paddingLeft: 24,
+                          }}>
+                            <span style={{ color: '#9ca3af', marginRight: 6 }}>└</span>
+                            <span style={{ fontWeight: 600 }}>{bd.name}</span>
+                          </td>
+                          <td style={{ ...cellBase, fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>목표</td>
+                          <MonthRow values={bd.targets} isActual={false} targets={bd.targets} />
+                        </tr>
+                        <tr style={{ background: '#fafbfc' }}>
+                          <td></td>
+                          <td style={{ ...cellBase, fontSize: 10, color: '#6b7280', fontWeight: 600 }}>실적</td>
+                          <MonthRow values={bd.actuals} isActual={true} targets={bd.targets} />
+                        </tr>
+                      </Fragment>
+                    ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
