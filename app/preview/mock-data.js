@@ -224,6 +224,22 @@ export const MOCK_BRAND_MGMT = {
   ],
 };
 
+// ─── 셀러 관리 페이지: 월별 목표 vs 실적 ───
+// 브랜드 관리와 동일한 구조. 발굴자 개념 없음 — 관리 담당자만.
+export const MOCK_SELLER_MGMT = {
+  months: ['5월', '6월', '7월', '8월', '9월', '10월'],
+  sellers: [
+    { name: '오인스',         manager: '김규민', targets: [380,380,400,400,420,420], actuals: [377,420,510,180,450,610] },
+    { name: '김영은',         manager: '정석호', targets: [180,180,200,200,220,220], actuals: [126,165,240, 90,210,280] },
+    { name: '달빛언니',       manager: '정석호', targets: [120,120,130,130,150,150], actuals: [ 54, 98,140, 50,160,170] },
+    { name: '선선부부하우스', manager: '강규성', targets: [ 80, 80, 90, 90,100,100], actuals: [ 46, 75,110, 30, 90,120] },
+    { name: '모노마켓',       manager: '강규성', targets: [ 50, 60, 70, 70, 80, 80], actuals: [  1, 25, 40, 10, 60, 75] },
+    { name: '풀킴',           manager: '정석호', targets: [ 30, 50, 80, 80,100,100], actuals: [  0,  5, 30, 20, 50, 90] },
+    { name: '심플팩토리',     manager: '김규민', targets: [200,200,200,200,200,200], actuals: [180,210,230,160,190,220] },
+    { name: '아임박선생',     manager: '강규성', targets: [100,100,100,100,100,100], actuals: [ 95, 80,110, 40, 90,100] },
+  ],
+};
+
 // ─── 통합 데이터 (preview-data API 응답과 동일 shape) ───
 // 페이지에서 MOCK_PREVIEW_DATA 하나만 import해서 쓰면 됨
 export const MOCK_PREVIEW_DATA = {
