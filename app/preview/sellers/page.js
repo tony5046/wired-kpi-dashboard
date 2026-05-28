@@ -3,8 +3,12 @@ import { useState, useMemo, Fragment } from 'react';
 import { MOCK_SELLER_MGMT, MOCK_PARTNER_NOTION } from '../mock-data';
 
 const MONTHS = MOCK_SELLER_MGMT.months;
-const SELLERS = MOCK_SELLER_MGMT.sellers;
+const ALL_SELLERS = MOCK_SELLER_MGMT.sellers;
+const COMPLETED_MONTHS = new Set(MOCK_SELLER_MGMT.completedMonths);
 const PARTNERS = new Set(Object.keys(MOCK_PARTNER_NOTION));
+
+// 담당자 목록 (mock 데이터에서 추출)
+const MANAGERS = [...new Set(ALL_SELLERS.map(s => s.manager))].sort();
 
 const sum = (arr) => arr.reduce((a, v) => a + v, 0);
 
@@ -33,11 +37,11 @@ function rateAccent(rate) {
 }
 
 // ─────────────── 페이지 헤더 + 통계 ───────────────
-function PageHeader() {
-  const totalT = SELLERS.reduce((s, x) => s + sum(x.targets), 0);
-  const totalA = SELLERS.reduce((s, x) => s + sum(x.actuals), 0);
+function PageHeader({ sellers }) {
+  const totalT = sellers.reduce((s, x) => s + sum(x.targets), 0);
+  const totalA = sellers.reduce((s, x) => s + sum(x.actuals), 0);
   const rate = totalT > 0 ? (totalA / totalT) * 100 : 0;
-  const partnerCount = SELLERS.filter(s => PARTNERS.has(s.name)).length;
+  const partnerCount = sellers.filter(s => PARTNERS.has(s.name)).length;
   const acc = rateAccent(rate);
 
   return (
@@ -55,17 +59,67 @@ function PageHeader() {
       {/* 통계 스트립 — 인디고 강조 */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
-        padding: 0, marginBottom: 20,
+        padding: 0, marginBottom: 16,
         background: '#fff', border: `1px solid ${C.divider}`, borderRadius: 12,
         overflow: 'hidden',
       }}>
-        <Stat label="관리 셀러" value={`${SELLERS.length}`} unit="곳" />
+        <Stat label="관리 셀러" value={`${sellers.length}`} unit="곳" />
         <Stat label="누적 목표" value={`${totalT.toLocaleString()}`} unit="백만원" />
         <Stat label="누적 실적" value={`${totalA.toLocaleString()}`} unit="백만원" accent />
         <Stat label="전체 달성률" value={`${rate.toFixed(1)}%`} accentColor={acc.color} bg={acc.bg} />
         <Stat label="🤝 파트너 셀러" value={`${partnerCount}`} unit="곳" />
       </div>
     </>
+  );
+}
+
+// ─────────────── 담당자 필터 칩 ───────────────
+function ManagerFilter({ managerFilter, setManagerFilter, partnerOnly, setPartnerOnly }) {
+  const totalCount = ALL_SELLERS.length;
+  const counts = MANAGERS.reduce((acc, m) => {
+    acc[m] = ALL_SELLERS.filter(s => s.manager === m).length;
+    return acc;
+  }, {});
+  const partnerCount = ALL_SELLERS.filter(s => PARTNERS.has(s.name)).length;
+
+  return (
+    <div style={{
+      display: 'flex', gap: 10, marginBottom: 16, padding: '12px 14px',
+      background: '#fff', border: `1px solid ${C.divider}`, borderRadius: 10,
+      alignItems: 'center', flexWrap: 'wrap',
+      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>담당자</span>
+        <Chip active={managerFilter === 'all'} onClick={() => setManagerFilter('all')}>
+          전체 ({totalCount})
+        </Chip>
+        {MANAGERS.map(m => (
+          <Chip key={m} active={managerFilter === m} onClick={() => setManagerFilter(m)}>
+            {m} ({counts[m]})
+          </Chip>
+        ))}
+      </div>
+      <div style={{ width: 1, height: 22, background: C.divider }} />
+      <Chip active={partnerOnly} onClick={() => setPartnerOnly(!partnerOnly)} accent>
+        🤝 파트너만 ({partnerCount})
+      </Chip>
+    </div>
+  );
+}
+
+function Chip({ active, onClick, children, accent }) {
+  const activeColor = accent ? C.indigo : C.ink;
+  return (
+    <button onClick={onClick} style={{
+      padding: '5px 11px', fontSize: 12,
+      fontWeight: active ? 700 : 500,
+      background: active ? activeColor : '#fff',
+      color: active ? '#fff' : C.muted,
+      border: '1px solid ' + (active ? activeColor : C.divider),
+      borderRadius: 14, cursor: 'pointer',
+      transition: 'all 0.12s',
+    }}>{children}</button>
   );
 }
 
@@ -100,9 +154,11 @@ function PartnerTag() {
 }
 
 // ============================================================
-//  디자인 A: 테이블 + 달성률 + 미니 바
+//  디자인 A: 테이블 + 달성률 + 셀러 클릭 → 월별 마켓 펼침
 // ============================================================
-function DesignA() {
+function DesignA({ sellers }) {
+  const [expanded, setExpanded] = useState(null);
+
   const th = {
     padding: '12px 8px',
     borderBottom: `2px solid ${C.divider}`,
@@ -118,7 +174,7 @@ function DesignA() {
 
   const grandT = new Array(MONTHS.length).fill(0);
   const grandA = new Array(MONTHS.length).fill(0);
-  for (const s of SELLERS) {
+  for (const s of sellers) {
     for (let i = 0; i < MONTHS.length; i++) {
       grandT[i] += s.targets[i];
       grandA[i] += s.actuals[i];
@@ -132,27 +188,55 @@ function DesignA() {
       border: `1px solid ${C.divider}`, borderRadius: 12,
       boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
     }}>
+      <div style={{
+        padding: '8px 12px', marginBottom: 10, background: C.indigoSoft,
+        border: `1px solid ${C.indigoMid}`, borderRadius: 6,
+        fontSize: 12, color: C.indigo, fontWeight: 500,
+      }}>
+        💡 셀러 행을 클릭하면 월별로 진행한/예정인 마켓 상세가 펼쳐져요 (실제매출 · 영업이익 · 예상매출)
+      </div>
+
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr>
+              <th style={{ ...th, width: 24 }}></th>
               <th style={thLeft}>셀러</th>
               <th style={thLeft}>담당자</th>
               <th style={th}>구분</th>
-              {MONTHS.map(m => <th key={m} style={{ ...th, minWidth: 54 }}>{m}</th>)}
+              {MONTHS.map((m, i) => (
+                <th key={m} style={{ ...th, minWidth: 54 }}>
+                  {m}
+                  {!COMPLETED_MONTHS.has(i) && (
+                    <div style={{ fontSize: 9, color: C.faint, fontWeight: 500, marginTop: 2 }}>예정</div>
+                  )}
+                </th>
+              ))}
               <th style={{ ...th, background: C.bg }}>Total</th>
               <th style={{ ...th, background: C.bg, minWidth: 90 }}>달성률</th>
             </tr>
           </thead>
           <tbody>
-            {SELLERS.map((s, i) => {
+            {sellers.map((s, i) => {
               const tTotal = sum(s.targets);
               const aTotal = sum(s.actuals);
               const rate = tTotal > 0 ? (aTotal / tTotal) * 100 : 0;
               const acc = rateAccent(rate);
+              const isOpen = expanded === s.name;
+
               return (
                 <Fragment key={s.name}>
-                  <tr style={{ borderTop: i > 0 ? `1px solid ${C.divider}` : 'none' }}>
+                  <tr
+                    onClick={() => setExpanded(isOpen ? null : s.name)}
+                    style={{
+                      borderTop: i > 0 ? `1px solid ${C.divider}` : 'none',
+                      cursor: 'pointer',
+                      background: isOpen ? C.indigoSoft : 'transparent',
+                    }}
+                  >
+                    <td rowSpan={2} style={{ ...td, textAlign: 'center', color: C.faint, verticalAlign: 'middle' }}>
+                      {isOpen ? '−' : '+'}
+                    </td>
                     <td rowSpan={2} style={{ ...td, fontWeight: 600, fontSize: 14, verticalAlign: 'middle' }}>
                       {s.name}
                       {PARTNERS.has(s.name) && <PartnerTag />}
@@ -168,7 +252,6 @@ function DesignA() {
                         background: acc.bg, color: acc.color,
                         fontWeight: 700, fontSize: 13,
                       }}>{rate.toFixed(0)}%</div>
-                      {/* 미니 프로그레스 바 */}
                       <div style={{ height: 4, background: '#f1f5f9', borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
                         <div style={{
                           width: `${Math.min(rate, 100)}%`, height: '100%',
@@ -177,19 +260,34 @@ function DesignA() {
                       </div>
                     </td>
                   </tr>
-                  <tr>
+                  <tr
+                    onClick={() => setExpanded(isOpen ? null : s.name)}
+                    style={{ cursor: 'pointer', background: isOpen ? C.indigoSoft : 'transparent' }}
+                  >
                     <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700 }}>실적</td>
                     {s.actuals.map((v, j) => (
-                      <td key={j} style={{ ...cellNum, fontWeight: 600, color: C.ink }}>{v}</td>
+                      <td key={j} style={{ ...cellNum, fontWeight: 600, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
                     ))}
                     <td style={{ ...cellNum, fontWeight: 700, background: C.bg, color: C.ink }}>{aTotal}</td>
                   </tr>
+
+                  {/* 펼침: 월별 마켓 상세 */}
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={MONTHS.length + 5} style={{ padding: 0, background: '#fafbff', borderBottom: `1px solid ${C.divider}` }}>
+                        <MarketDetail seller={s} />
+                      </td>
+                    </tr>
+                  )}
                 </Fragment>
               );
             })}
 
             {/* Total */}
             <tr style={{ borderTop: `2px solid ${C.indigo}`, background: C.indigoSoft }}>
+              <td></td>
               <td colSpan={2} rowSpan={2} style={{
                 ...td, fontWeight: 700, fontSize: 14,
                 textAlign: 'center', verticalAlign: 'middle', color: C.indigo,
@@ -203,8 +301,13 @@ function DesignA() {
               </td>
             </tr>
             <tr style={{ background: C.indigoSoft }}>
+              <td></td>
               <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft }}>실적</td>
-              {grandA.map((v, j) => <td key={j} style={{ ...cellNum, fontWeight: 700, color: C.ink, background: C.indigoSoft }}>{v}</td>)}
+              {grandA.map((v, j) => (
+                <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint, background: C.indigoSoft }}>
+                  {COMPLETED_MONTHS.has(j) ? v : '-'}
+                </td>
+              ))}
               <td style={{ ...cellNum, fontWeight: 800, color: C.indigo, background: C.indigoMid, fontSize: 14 }}>{sum(grandA)}</td>
             </tr>
           </tbody>
@@ -214,13 +317,87 @@ function DesignA() {
   );
 }
 
+// 셀러 펼친 영역: 월별 마켓 상세
+function MarketDetail({ seller }) {
+  return (
+    <div style={{ padding: '14px 20px 20px' }}>
+      <div style={{ fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>
+        📋 {seller.name} 마켓 진행 내역
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        {MONTHS.map((monthLabel, mIdx) => {
+          const markets = seller.marketsByMonth[mIdx] || [];
+          const isCompleted = COMPLETED_MONTHS.has(mIdx);
+          return (
+            <div key={monthLabel} style={{
+              padding: 12, background: '#fff',
+              border: `1px solid ${C.divider}`, borderRadius: 8,
+            }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${C.divider}`,
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{monthLabel}</span>
+                <span style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 8, fontWeight: 600,
+                  background: isCompleted ? C.emeraldSoft : C.amberSoft,
+                  color: isCompleted ? C.emerald : C.amber,
+                }}>
+                  {isCompleted ? '✓ 완료' : '⏳ 예정'}
+                </span>
+              </div>
+
+              {markets.length === 0 ? (
+                <div style={{ fontSize: 11, color: C.faint, textAlign: 'center', padding: '8px 0' }}>
+                  마켓 없음
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {markets.map((m, mi) => (
+                    <div key={mi} style={{ paddingBottom: mi < markets.length - 1 ? 8 : 0, borderBottom: mi < markets.length - 1 ? `1px dashed ${C.divider}` : 'none' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, marginBottom: 4 }}>
+                        {m.name}
+                      </div>
+                      <div style={{ display: 'flex', gap: 0, fontSize: 11 }}>
+                        <MarketMetric label="실제매출" value={isCompleted ? m.actualSales : null} accent={isCompleted} />
+                        <MarketMetric label="영업이익" value={isCompleted ? m.profit : null} />
+                        <MarketMetric label="예상매출" value={m.estimatedSales} muted />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MarketMetric({ label, value, accent, muted }) {
+  return (
+    <div style={{ flex: 1, paddingRight: 6 }}>
+      <div style={{ fontSize: 9, color: C.faint, marginBottom: 2 }}>{label}</div>
+      <div style={{
+        fontSize: 13,
+        fontWeight: accent ? 700 : 600,
+        color: value == null ? C.faint : accent ? C.indigo : muted ? C.muted : C.ink,
+      }}>
+        {value == null ? '-' : value}
+        <span style={{ fontSize: 9, fontWeight: 500, color: C.faint, marginLeft: 1 }}>M</span>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 //  디자인 B: 카드 그리드 + 막대 + 달성률 강조
 // ============================================================
-function DesignB() {
+function DesignB({ sellers }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-      {SELLERS.map(s => {
+      {sellers.map(s => {
         const totalT = sum(s.targets);
         const totalA = sum(s.actuals);
         const rate = totalT > 0 ? (totalA / totalT) * 100 : 0;
@@ -338,7 +515,7 @@ function DesignB() {
 // ============================================================
 //  디자인 C: 라인 추이 + 영역 그라데이션 + 끝점 강조
 // ============================================================
-function DesignC() {
+function DesignC({ sellers }) {
   return (
     <div style={{
       padding: 20, background: '#fff',
@@ -362,7 +539,7 @@ function DesignC() {
           <div style={{ textAlign: 'right' }}>달성률</div>
         </div>
 
-        {SELLERS.map((s, i) => {
+        {sellers.map((s, i) => {
           const totalT = sum(s.targets);
           const totalA = sum(s.actuals);
           const rate = totalT > 0 ? (totalA / totalT) * 100 : 0;
@@ -392,7 +569,7 @@ function DesignC() {
               gridTemplateColumns: '200px 90px 1fr 80px 80px 90px',
               gap: 16, padding: '16px 12px',
               alignItems: 'center',
-              borderBottom: i < SELLERS.length - 1 ? `1px solid ${C.divider}` : 'none',
+              borderBottom: i < sellers.length - 1 ? `1px solid ${C.divider}` : 'none',
               fontSize: 13,
               transition: 'background 0.15s',
             }}
@@ -482,10 +659,28 @@ function DesignC() {
 // ─────────────── 메인 ───────────────
 export default function SellersPage() {
   const [design, setDesign] = useState('A');
+  const [managerFilter, setManagerFilter] = useState('all');
+  const [partnerOnly, setPartnerOnly] = useState(false);
+
+  // 필터 적용된 셀러 리스트
+  const filteredSellers = useMemo(() => {
+    let arr = ALL_SELLERS;
+    if (managerFilter !== 'all') arr = arr.filter(s => s.manager === managerFilter);
+    if (partnerOnly) arr = arr.filter(s => PARTNERS.has(s.name));
+    return arr;
+  }, [managerFilter, partnerOnly]);
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
-      <PageHeader />
+      <PageHeader sellers={filteredSellers} />
+
+      {/* 담당자 필터 */}
+      <ManagerFilter
+        managerFilter={managerFilter}
+        setManagerFilter={setManagerFilter}
+        partnerOnly={partnerOnly}
+        setPartnerOnly={setPartnerOnly}
+      />
 
       {/* 디자인 선택 */}
       <div style={{
@@ -497,7 +692,7 @@ export default function SellersPage() {
       }}>
         <span style={{ fontSize: 12, color: C.muted, marginRight: 8, fontWeight: 600 }}>디자인 비교:</span>
         {[
-          { k: 'A', label: 'A · 테이블 + 달성률 바' },
+          { k: 'A', label: 'A · 테이블 + 마켓 펼침' },
           { k: 'B', label: 'B · 카드 + 막대' },
           { k: 'C', label: 'C · 라인 추이 (sparkline)' },
         ].map(opt => (
@@ -517,9 +712,20 @@ export default function SellersPage() {
         ))}
       </div>
 
-      {design === 'A' && <DesignA />}
-      {design === 'B' && <DesignB />}
-      {design === 'C' && <DesignC />}
+      {filteredSellers.length === 0 ? (
+        <div style={{
+          padding: 60, textAlign: 'center', color: C.faint, fontSize: 13,
+          background: '#fff', border: `1px solid ${C.divider}`, borderRadius: 12,
+        }}>
+          조건에 맞는 셀러 없음
+        </div>
+      ) : (
+        <>
+          {design === 'A' && <DesignA sellers={filteredSellers} />}
+          {design === 'B' && <DesignB sellers={filteredSellers} />}
+          {design === 'C' && <DesignC sellers={filteredSellers} />}
+        </>
+      )}
     </main>
   );
 }

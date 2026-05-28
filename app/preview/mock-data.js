@@ -224,20 +224,135 @@ export const MOCK_BRAND_MGMT = {
   ],
 };
 
-// ─── 셀러 관리 페이지: 월별 목표 vs 실적 ───
-// 브랜드 관리와 동일한 구조. 발굴자 개념 없음 — 관리 담당자만.
+// ─── 셀러 관리 페이지: 월별 목표 vs 실적 + 마켓 상세 ───
+// 30명 셀러, 4명 담당자, 6개월 데이터. 각 월마다 마켓 1~4개.
+// 마켓 데이터: 실제매출, 영업이익, 예상매출, status(completed/planned)
+// 현재 시점 가정: 5월 (5월~7월 = completed, 8월~10월 = planned)
+
+const SELLER_MGMT_MONTHS = ['5월', '6월', '7월', '8월', '9월', '10월'];
+
+// 결정적 random (seed 기반) — 매번 같은 데이터
+function makeRandom(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
+const SELLER_LIST_30 = [
+  // [이름, 담당자, 파트너여부, seed]
+  ['오인스',         '김규민', true,   1],
+  ['김영은',         '정석호', true,   2],
+  ['달빛언니',       '정석호', true,   3],
+  ['선선부부하우스', '강규성', true,   4],
+  ['모노마켓',       '강규성', true,   5],
+  ['풀킴',           '정석호', true,   6],
+  ['심플팩토리',     '김규민', false,  7],
+  ['아임박선생',     '강규성', false,  8],
+  ['바이미룸',       '김규민', false,  9],
+  ['미니결',         '정석호', false, 10],
+  ['포유홈',         '김규민', false, 11],
+  ['김별샘',         '강규성', false, 12],
+  ['나풀나풀',       '정석호', false, 13],
+  ['그집1303',       '김규민', false, 14],
+  ['깎언니',         '강규성', false, 15],
+  ['런던하이',       '정석호', false, 16],
+  ['히히스카이라운지','김규민', false, 17],
+  ['코앤텍',         '최예린', false, 18],
+  ['빅토리사',       '최예린', false, 19],
+  ['앙젤리크',       '김규민', false, 20],
+  ['쏘핑네흰집',     '정석호', false, 21],
+  ['후후맘',         '강규성', false, 22],
+  ['델라맘마',       '최예린', false, 23],
+  ['뚜미니네',       '최예린', false, 24],
+  ['매주가족',       '정석호', false, 25],
+  ['그린오마',       '강규성', false, 26],
+  ['베이비락',       '김규민', false, 27],
+  ['키즈홈',         '정석호', false, 28],
+  ['라떼유나',       '강규성', false, 29],
+  ['헤일리하우스',   '최예린', false, 30],
+];
+
+// 마켓 이름 풀
+const MARKET_NAME_POOL = [
+  '폴레드 에어러브5', '메이슨캣 화장품', '루메나 선풍기', '신상 키친 브랜드', '오로바일렌 비타민',
+  '퓨어레비 클렌저', '드시모네 락토',  '허그베어 인형', '동국제약 영양제', '테코야 후라이팬',
+  '블랙홀 코팅큐',    '디귿 주방',       '트루티 음료',   '트루쿡 그릇',     '씨밀렉스 영양',
+  '신일 제습기',     '코닥 카메라',     'VDL 메이크업',  '로라애슐리 침구', '메디힐 마스크팩',
+  '풀무원 발효',     '나무엑스 가구',   '경자국밥 밀키트', '콤비타 꿀',     '셀라보드 비누',
+  '더모비 가전',     '디카페인 음료',   '멜리언스 헬스케어','오마뎅 어묵',    '금왕 라면',
+];
+
+function genSellerData(name, manager, isPartner, seed) {
+  const rand = makeRandom(seed * 7 + 11);
+  // 셀러 규모 (시드에 따라)
+  const scale = 0.3 + rand() * 1.4;  // 0.3 ~ 1.7 배율
+
+  const targets = [];
+  const actuals = [];
+  const marketsByMonth = [];
+
+  for (let mIdx = 0; mIdx < SELLER_MGMT_MONTHS.length; mIdx++) {
+    const isCompleted = mIdx < 3; // 5~7월 완료, 8~10월 예정
+    const baseTarget = Math.round((50 + rand() * 150) * scale);
+    const target = baseTarget + Math.round(mIdx * rand() * 20); // 월별 약간 증가
+    targets.push(target);
+
+    // 마켓 개수 1~4개
+    const marketCount = 1 + Math.floor(rand() * 3.5);
+    const markets = [];
+    let monthActualSum = 0;
+    let monthProfitSum = 0;
+
+    for (let i = 0; i < marketCount; i++) {
+      const marketNameIdx = Math.floor(rand() * MARKET_NAME_POOL.length);
+      const marketName = MARKET_NAME_POOL[marketNameIdx];
+      const estimated = Math.round((target / marketCount) * (0.7 + rand() * 0.7));
+
+      let actual, profit;
+      if (isCompleted) {
+        // 완료된 마켓: 목표의 60~120%
+        actual = Math.round(estimated * (0.6 + rand() * 0.6));
+        profit = Math.round(actual * (0.08 + rand() * 0.1)); // 영업이익 8~18%
+      } else {
+        // 예정된 마켓: 실제/이익 0
+        actual = 0;
+        profit = 0;
+      }
+
+      monthActualSum += actual;
+      monthProfitSum += profit;
+
+      markets.push({
+        name: marketName,
+        estimatedSales: estimated,
+        actualSales: actual,
+        profit,
+        status: isCompleted ? 'completed' : 'planned',
+      });
+    }
+
+    actuals.push(monthActualSum);
+    marketsByMonth.push(markets);
+  }
+
+  return {
+    name, manager, isPartner,
+    targets, actuals, marketsByMonth,
+  };
+}
+
+const generatedSellers = SELLER_LIST_30.map(([name, manager, isPartner, seed]) =>
+  genSellerData(name, manager, isPartner, seed)
+);
+
 export const MOCK_SELLER_MGMT = {
-  months: ['5월', '6월', '7월', '8월', '9월', '10월'],
-  sellers: [
-    { name: '오인스',         manager: '김규민', targets: [380,380,400,400,420,420], actuals: [377,420,510,180,450,610] },
-    { name: '김영은',         manager: '정석호', targets: [180,180,200,200,220,220], actuals: [126,165,240, 90,210,280] },
-    { name: '달빛언니',       manager: '정석호', targets: [120,120,130,130,150,150], actuals: [ 54, 98,140, 50,160,170] },
-    { name: '선선부부하우스', manager: '강규성', targets: [ 80, 80, 90, 90,100,100], actuals: [ 46, 75,110, 30, 90,120] },
-    { name: '모노마켓',       manager: '강규성', targets: [ 50, 60, 70, 70, 80, 80], actuals: [  1, 25, 40, 10, 60, 75] },
-    { name: '풀킴',           manager: '정석호', targets: [ 30, 50, 80, 80,100,100], actuals: [  0,  5, 30, 20, 50, 90] },
-    { name: '심플팩토리',     manager: '김규민', targets: [200,200,200,200,200,200], actuals: [180,210,230,160,190,220] },
-    { name: '아임박선생',     manager: '강규성', targets: [100,100,100,100,100,100], actuals: [ 95, 80,110, 40, 90,100] },
-  ],
+  months: SELLER_MGMT_MONTHS,
+  sellers: generatedSellers,
+  // 현재 시점: 5~7월 completed, 8~10월 planned
+  completedMonths: [0, 1, 2],
+  plannedMonths: [3, 4, 5],
 };
 
 // ─── 통합 데이터 (preview-data API 응답과 동일 shape) ───
