@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import ChatWidget from '../chat-widget';
+import { MOCK_PREVIEW_DATA } from './mock-data';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -957,128 +958,50 @@ function BestMarkets({ markets }) {
   );
 }
 
-// ─────────────── 로딩/에러 ───────────────
-function LoadingPanel() {
-  return (
-    <div style={{ ...card, textAlign: 'center', padding: 60 }}>
-      <div style={{ fontSize: 24, marginBottom: 12 }}>⏳</div>
-      <div style={{ fontSize: 14, color: '#6b7280' }}>실데이터 불러오는 중...</div>
-      <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>와이어드민 + 구글시트 동시 호출 (보통 5~15초)</div>
-    </div>
-  );
-}
-
-function ErrorPanel({ message }) {
-  return (
-    <div style={{ ...card, background: '#fef2f2', border: '1px solid #fca5a5' }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#991b1b', marginBottom: 6 }}>⚠️ 데이터 불러오기 실패</div>
-      <div style={{ fontSize: 12, color: '#7f1d1d', fontFamily: 'monospace', wordBreak: 'break-all' }}>{message}</div>
-    </div>
-  );
-}
-
 // ─────────────── 메인 ───────────────
 export default function Preview() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/preview-data')
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.message || d.error);
-        else setData(d);
-      })
-      .catch(e => setError(e.message));
-  }, []);
+  // Mock 데이터 — 디자인 iteration 속도를 위해 즉시 로드 (API 호출 없음)
+  const data = MOCK_PREVIEW_DATA;
+  const error = null;
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, margin: 0 }}>📊 매출 현황</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          매출 = <strong>와이어드 매출 (totalWiredSalesAmount)</strong> · 지난 달까지는 사업개발 시트 (정산 기준 확정값) · <strong style={{ color: '#2563eb' }}>이번 달은 와이어드민 실시간</strong>
+          <span style={{ padding: '2px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontWeight: 600, fontSize: 11, marginRight: 6 }}>mock 데이터</span>
+          디자인 iteration용 가상 데이터 · 실데이터 연동은 와이어드민 + 준비 중인 사이트에서 추후
         </p>
       </header>
 
-      {error && <ErrorPanel message={error} />}
-      {!data && !error && <LoadingPanel />}
+      <div style={{ marginBottom: 24 }}>
+        <TrendChart
+          trend={data.trend}
+          monthTargetAvg={data.monthTargetAvg}
+          yearTarget={data.yearTarget}
+          quarterTarget={data.quarterTarget}
+          ytdSales={data.ytdSales}
+          qtdSales={data.qtdSales}
+          yearProgress={data.yearProgress}
+          quarterProgress={data.quarterProgress}
+        />
+      </div>
 
-      {data && (
-        <>
-          <div style={{ marginBottom: 24 }}>
-            <TrendChart
-              trend={data.trend}
-              monthTargetAvg={data.monthTargetAvg}
-              yearTarget={data.yearTarget}
-              quarterTarget={data.quarterTarget}
-              ytdSales={data.ytdSales}
-              qtdSales={data.qtdSales}
-              yearProgress={data.yearProgress}
-              quarterProgress={data.quarterProgress}
-            />
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <PartnerSellersSection partnerStats={data.partnerStats} />
+      </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <PartnerSellersSection partnerStats={data.partnerStats} />
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <BestMarkets markets={data.marketsList} />
+      </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <BestMarkets markets={data.marketsList} />
-          </div>
+      <div style={{ marginBottom: 24 }}>
+        <MarketsSection markets={data.marketsList} />
+      </div>
 
-          <div style={{ marginBottom: 24 }}>
-            <MarketsSection markets={data.marketsList} />
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <BrandsSection markets={data.marketsList} brands={data.brands} />
-          </div>
-
-          {/* 에러 디버깅 (혹시 일부만 실패한 경우) */}
-          {data.errors && Object.values(data.errors).some(Boolean) && (
-            <div style={{
-              padding: 14, background: '#fef2f2', border: '1px solid #fca5a5',
-              borderRadius: 8, fontSize: 12, color: '#7f1d1d', marginBottom: 24,
-            }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>⚠️ 데이터 가져오기 실패 상세</div>
-              <div style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6 }}>
-                {Object.entries(data.errors).filter(([_, v]) => v).map(([k, v]) => (
-                  <div key={k} style={{ marginBottom: 4, wordBreak: 'break-all' }}>
-                    <strong style={{ color: '#991b1b' }}>{k}:</strong> {String(v).slice(0, 300)}
-                  </div>
-                ))}
-              </div>
-              {data.debug && (
-                <div style={{ marginTop: 10, padding: 8, background: '#fff', borderRadius: 4, fontSize: 11, color: '#374151' }}>
-                  <strong>디버그 카운트:</strong>{' '}
-                  마켓 {data.debug.thisMonthMarkets}개 ·
-                  셀러 {data.debug.thisMonthSellers}명 ·
-                  주문 {data.debug.thisMonthTotalOrders}건 ·
-                  YTD 매출 {(data.debug.thisYearTotalSales || 0).toLocaleString('ko-KR')}원
-                </div>
-              )}
-            </div>
-          )}
-
-          <div style={{
-            padding: 16, background: '#eff6ff', border: '1px solid #bfdbfe',
-            borderRadius: 12, fontSize: 13, lineHeight: 1.6,
-          }}>
-            💡 <strong>이번 버전 (v5 실데이터):</strong>
-            <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-              <li>✅ 월별 매출 추이 — 구글시트 '사업개발' 탭에서 자동</li>
-              <li>✅ 연/분기 목표 달성률 — 와이어드민 주문 API 실시간 합계</li>
-              <li>✅ 파트너 셀러 카드 6명 — 실제 매출/마켓건수 (저번달/이번달/다음달 예상)</li>
-              <li>✅ 이번달 마켓 현황 — 와이어드민 마켓 API</li>
-              <li>✅ 브랜드별 현황 — 마켓 기반 자동 집계</li>
-              <li>⏸️ 팀 합작 대시보드 — 코드 보존, 화면에서 잠시 빼둠 (마케팅/CS/물류 담당자 API 연동 후 복원)</li>
-              <li>⏸️ CS율 / 배송완료율 / 릴스 조회수 — 와이어드민 API 추가 연동 필요 (현재 N/A)</li>
-              <li>⏸️ 노션 기획 정보 (마켓 펼침) — 아직 mock, 노션 자동 매칭 작업 필요</li>
-            </ul>
-          </div>
-        </>
-      )}
+      <div style={{ marginBottom: 24 }}>
+        <BrandsSection markets={data.marketsList} brands={data.brands} />
+      </div>
 
       <ChatWidget />
     </main>

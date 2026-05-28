@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
+import { MOCK_PREVIEW_DATA, MOCK_PARTNER_NOTION } from '../mock-data';
 
 function fmt(v) { return (v ?? 0).toLocaleString('ko-KR') + '백만원'; }
 
@@ -11,15 +12,7 @@ const card = {
 const th = { padding: '10px 8px', borderBottom: '2px solid #e5e7eb', fontSize: 11, color: '#6b7280', fontWeight: 600, textAlign: 'left' };
 const td = { padding: '10px 8px', borderBottom: '1px solid #f3f4f6', fontSize: 13 };
 
-// 파트너 셀러 → 노션 URL 매핑 (preview-data에서 가져올 수도 있지만 정적이라 여기 두기)
-const PARTNER_NOTION = {
-  '오인스':         'https://www.notion.so/wiredcompany/4b95b76922a7421db79bf1563290545c',
-  '달빛언니':       'https://www.notion.so/wiredcompany/2544120083b080e889c5ea45a008896c',
-  '선선부부하우스': 'https://www.notion.so/wiredcompany/2544120083b08086a1e9f533dd2dcc24',
-  '김영은':         'https://www.notion.so/wiredcompany/2544120083b0804e97e9d355492a9f5a',
-  '모노마켓':       'https://www.notion.so/wiredcompany/31e4120083b0801ea881f6a563c5973d',
-  '풀킴':           'https://www.notion.so/wiredcompany/31f4120083b08053a12bee60e9473c46',
-};
+const PARTNER_NOTION = MOCK_PARTNER_NOTION;
 
 function SectionTitle({ emoji, title, hint }) {
   return (
@@ -66,24 +59,15 @@ function PartnerBadge() {
 }
 
 export default function SellersPage() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  // Mock 데이터 — 즉시 로드 (API 호출 없음)
+  const data = MOCK_PREVIEW_DATA;
+  const error = null;
 
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('sales');
   const [managerFilter, setManagerFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all'); // 'all' | 'partner' | 'regular'
   const [expanded, setExpanded] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/preview-data')
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.message || d.error);
-        else setData(d);
-      })
-      .catch(e => setError(e.message));
-  }, []);
 
   const aggregated = useMemo(() => {
     if (!data?.sellers) return [];
@@ -138,7 +122,8 @@ export default function SellersPage() {
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, margin: 0 }}>🤝 셀러 관리</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          이번달 진행 셀러 · 파트너 / 담당자 필터 · 셀러 클릭 → 마켓 / 브랜드 / 노션 페이지
+          <span style={{ padding: '2px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontWeight: 600, fontSize: 11, marginRight: 6 }}>mock 데이터</span>
+          파트너 / 담당자 필터 · 셀러 클릭 → 마켓 / 브랜드 / 노션 페이지
         </p>
       </header>
 

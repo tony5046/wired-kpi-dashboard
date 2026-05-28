@@ -1,55 +1,12 @@
 'use client';
 import { useState, useMemo, Fragment } from 'react';
+import { MOCK_BRAND_MGMT } from '../mock-data';
 
-// ─────────────── MOCK 데이터 ───────────────
-// TODO: 향후 와이어드민 + 준비 중인 별도 사이트에서 데이터 가져올 예정
-//
-// 데이터 출처 (계획):
-//   - 브랜드 메타 (발굴/관리 담당자): 준비 중인 사이트 또는 GSD 별도 시트
-//   - 월별 목표:                       사업개발팀 분기별 설정
-//   - 월별 실적:                       와이어드민 API (totalWiredSalesAmount)
-//
+// MOCK 데이터는 ../mock-data.js 의 MOCK_BRAND_MGMT 에서 가져옴.
 // 단위: 모든 숫자는 백만원
 
-const MONTHS = ['5월', '6월', '7월', '8월', '9월', '10월'];
-
-const BRANDS_MOCK = [
-  {
-    name: '멜리언스',
-    discoverer: '홍만의',
-    manager: '정석호',
-    targets:  [10, 10, 10, 10, 10, 10],
-    actuals:  [ 1,  2,  3,  4,  5,  6],
-  },
-  {
-    name: '오마뎅',
-    discoverer: '홍소의',
-    manager: '박준호',
-    targets:  [20, 20, 20, 20, 20, 20],
-    actuals:  [ 7,  8,  9,  0, 10, 11],
-  },
-  {
-    name: '씨밀렉스',
-    discoverer: '김규민',
-    manager: '이민우',
-    targets:  [10, 10, 10, 10, 10, 10],
-    actuals:  [11,  4, 21, 10,  5,  1],
-  },
-  {
-    name: '금왕',
-    discoverer: '강규성',
-    manager: '김규민',
-    targets:  [20, 20, 20, 20, 20, 20],
-    actuals:  [10, 20, 30,  4,  5,  6],
-  },
-  {
-    name: '올레아',
-    discoverer: '박준호',
-    manager: '강규성',
-    targets:  [10, 10, 10, 10, 10, 10],
-    actuals:  [11, 12, 13, 14, 15, 16],
-  },
-];
+const MONTHS = MOCK_BRAND_MGMT.months;
+const BRANDS_MOCK = MOCK_BRAND_MGMT.brands;
 
 // ─────────────── 유틸 ───────────────
 const sum = (arr) => arr.reduce((a, v) => a + v, 0);
