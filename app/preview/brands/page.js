@@ -2,55 +2,49 @@
 import { useState, useMemo, Fragment } from 'react';
 import { MOCK_BRAND_MGMT } from '../mock-data';
 
-// MOCK 데이터는 ../mock-data.js 의 MOCK_BRAND_MGMT 에서 가져옴.
-// 단위: 모든 숫자는 백만원
-
 const MONTHS = MOCK_BRAND_MGMT.months;
 const BRANDS_MOCK = MOCK_BRAND_MGMT.brands;
 
-// ─────────────── 유틸 ───────────────
 const sum = (arr) => arr.reduce((a, v) => a + v, 0);
 
-// 셀 색상 (실적 vs 목표)
-function rateColor(actual, target) {
-  if (target === 0) return { color: '#9ca3af', bg: 'transparent' };
-  const rate = actual / target;
-  if (rate >= 1.0)  return { color: '#065f46', bg: '#d1fae5' };
-  if (rate >= 0.7)  return { color: '#92400e', bg: '#fef3c7' };
-  if (rate >= 0.3)  return { color: '#9a3412', bg: '#fed7aa' };
-  return { color: '#991b1b', bg: '#fee2e2' };
-}
-
-// ─────────────── 스타일 ───────────────
+// ─────────────── 스타일 (미니멀) ───────────────
 const card = {
-  padding: 20, background: '#fff',
-  border: '1px solid #e5e7eb', borderRadius: 14,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  padding: 20,
+  background: '#fff',
+  border: '1px solid #e5e7eb',
+  borderRadius: 10,
 };
 const th = {
-  padding: '12px 8px',
-  borderBottom: '2px solid #e5e7eb',
-  fontSize: 11, color: '#6b7280', fontWeight: 600,
-  textAlign: 'left', whiteSpace: 'nowrap',
+  padding: '10px 8px',
+  borderBottom: '1px solid #d1d5db',
+  fontSize: 11,
+  color: '#6b7280',
+  fontWeight: 600,
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
 };
+const thLeft = { ...th, textAlign: 'left' };
 const td = {
   padding: '8px',
   fontSize: 13,
+  color: '#374151',
   borderBottom: '1px solid #f3f4f6',
 };
-const cellBase = {
-  padding: '8px 6px', textAlign: 'center',
-  borderBottom: '1px solid #f3f4f6',
+const cellNum = {
+  padding: '6px 8px',
+  textAlign: 'center',
   fontSize: 13,
+  color: '#374151',
+  borderBottom: '1px solid #f3f4f6',
 };
 
 // ─────────────── 컴포넌트 ───────────────
-function SectionTitle({ emoji, title, hint, action }) {
+function SectionTitle({ title, hint, action }) {
   return (
     <div style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{emoji} {title}</h2>
-        {hint && <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>{hint}</p>}
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: '#111' }}>{title}</h2>
+        {hint && <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>{hint}</p>}
       </div>
       {action}
     </div>
@@ -60,63 +54,52 @@ function SectionTitle({ emoji, title, hint, action }) {
 function ToggleBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
-      padding: '8px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
-      background: active ? '#2563eb' : '#fff',
-      color: active ? '#fff' : '#374151',
-      border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
+      padding: '6px 12px', fontSize: 12,
+      fontWeight: active ? 600 : 400,
+      background: active ? '#111' : '#fff',
+      color: active ? '#fff' : '#6b7280',
+      border: '1px solid ' + (active ? '#111' : '#d1d5db'),
       borderRadius: 6, cursor: 'pointer',
     }}>{children}</button>
   );
 }
 
-function SummaryCard({ label, value, accent }) {
+// 숫자 셀 — 색상 없음, 굵기로만 강조
+function NumCell({ value, bold = false, muted = false, bg }) {
   return (
-    <div style={{
-      padding: 16, background: '#fff',
-      border: '1px solid #e5e7eb', borderRadius: 12,
-      borderLeft: `4px solid ${accent}`,
+    <td style={{
+      ...cellNum,
+      fontWeight: bold ? 700 : 400,
+      color: muted ? '#9ca3af' : value === 0 ? '#9ca3af' : '#1f2937',
+      background: bg || 'transparent',
     }}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: '#111' }}>{value}</div>
-    </div>
+      {value}
+    </td>
   );
 }
 
-// 한 행 = 목표 또는 실적
-function MonthRow({ values, isActual, targets, totalBg = '#eff6ff' }) {
+// 한 행에 (월별 + Total)
+function MonthRow({ values, bold = false, muted = false, totalBg = '#f9fafb' }) {
   const total = sum(values);
   return (
     <>
-      {values.map((v, j) => {
-        if (isActual) {
-          const { color, bg } = rateColor(v, targets[j]);
-          return (
-            <td key={j} style={{ ...cellBase, color, background: bg, fontWeight: 700 }}>{v}</td>
-          );
-        }
-        return (
-          <td key={j} style={{ ...cellBase, color: '#6b7280' }}>{v}</td>
-        );
-      })}
-      <td style={{ ...cellBase, fontWeight: 700, background: isActual ? '#dbeafe' : totalBg, color: isActual ? '#37352f' : '#374151' }}>
-        {total}
-      </td>
+      {values.map((v, j) => <NumCell key={j} value={v} bold={bold} muted={muted} />)}
+      <NumCell value={total} bold={true} bg={totalBg} />
     </>
   );
 }
 
 // ─────────────── 메인 ───────────────
 export default function BrandsPage() {
-  const [managerMode, setManagerMode] = useState('discoverer'); // 'discoverer' | 'manager'
-  const [expandedMgr, setExpandedMgr] = useState(null); // 펼친 담당자 이름
+  const [managerMode, setManagerMode] = useState('discoverer');
+  const [expandedMgr, setExpandedMgr] = useState(null);
 
-  // 담당자 모드 바뀌면 펼침 초기화
   function switchMode(mode) {
     setManagerMode(mode);
     setExpandedMgr(null);
   }
 
-  // 담당자별 집계 — brandDetails로 각 브랜드별 세부 추적
+  // 담당자별 집계
   const byManager = useMemo(() => {
     const map = new Map();
     for (const b of BRANDS_MOCK) {
@@ -127,24 +110,20 @@ export default function BrandsPage() {
         targets: new Array(MONTHS.length).fill(0),
         actuals: new Array(MONTHS.length).fill(0),
         brands: [],
-        brandDetails: [],   // [{ name, targets, actuals }]
+        brandDetails: [],
       };
       for (let i = 0; i < MONTHS.length; i++) {
         cur.targets[i] += b.targets[i];
         cur.actuals[i] += b.actuals[i];
       }
       cur.brands.push(b.name);
-      cur.brandDetails.push({
-        name: b.name,
-        targets: b.targets,
-        actuals: b.actuals,
-      });
+      cur.brandDetails.push({ name: b.name, targets: b.targets, actuals: b.actuals });
       map.set(key, cur);
     }
     return [...map.values()].sort((a, b) => sum(b.actuals) - sum(a.actuals));
   }, [managerMode]);
 
-  // Total 행 (브랜드별 테이블)
+  // 전체 Total
   const grandTargets = new Array(MONTHS.length).fill(0);
   const grandActuals = new Array(MONTHS.length).fill(0);
   for (const b of BRANDS_MOCK) {
@@ -153,84 +132,75 @@ export default function BrandsPage() {
       grandActuals[i] += b.actuals[i];
     }
   }
-
-  // 요약
-  const totalTargetAll = sum(grandTargets);
-  const totalActualAll = sum(grandActuals);
-  const overallRate = totalTargetAll > 0 ? (totalActualAll / totalTargetAll) * 100 : 0;
+  const totalT = sum(grandTargets);
+  const totalA = sum(grandActuals);
+  const rate = totalT > 0 ? (totalA / totalT) * 100 : 0;
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, margin: 0 }}>🏷️ 브랜드 관리</h1>
-        <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          브랜드별 월별 <strong>목표</strong> vs <strong>실적</strong> · 발굴/관리 담당자별 집계 ·
-          <span style={{ marginLeft: 6, padding: '2px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontWeight: 600, fontSize: 11 }}>현재 mock 데이터</span>
+      <header style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, margin: 0, color: '#111' }}>브랜드 관리</h1>
+        <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+          브랜드별 월별 목표 vs 실적 · 단위: 백만원 · <span style={{ color: '#6b7280' }}>mock 데이터</span>
         </p>
       </header>
 
-      {/* 요약 카드 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-        <SummaryCard label="관리 브랜드" value={`${BRANDS_MOCK.length}개`} accent="#2563eb" />
-        <SummaryCard label="누적 목표 (6개월)" value={`${totalTargetAll}백만원`} accent="#6b7280" />
-        <SummaryCard label="누적 실적 (6개월)" value={`${totalActualAll}백만원`} accent="#10b981" />
-        <SummaryCard
-          label="전체 달성률"
-          value={`${overallRate.toFixed(1)}%`}
-          accent={overallRate >= 100 ? '#10b981' : overallRate >= 70 ? '#f59e0b' : '#ef4444'}
-        />
+      {/* 한 줄 요약 — 카드 대신 텍스트 */}
+      <div style={{
+        display: 'flex', gap: 32, padding: '12px 16px', marginBottom: 16,
+        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+        fontSize: 13,
+      }}>
+        <Stat label="관리 브랜드" value={`${BRANDS_MOCK.length}개`} />
+        <Stat label="누적 목표" value={`${totalT}`} unit="백만원" />
+        <Stat label="누적 실적" value={`${totalA}`} unit="백만원" />
+        <Stat label="달성률" value={`${rate.toFixed(0)}%`} muted={rate < 70} />
       </div>
 
       {/* 테이블 1: 브랜드별 */}
-      <div style={{ ...card, marginBottom: 20 }}>
-        <SectionTitle
-          emoji="📊"
-          title="브랜드별 월별 목표 vs 실적"
-          hint="실적 셀 색상: 🟢 100%+ 달성 · 🟡 70%~ · 🟠 30%~ · 🔴 30% 미만"
-        />
+      <div style={{ ...card, marginBottom: 16 }}>
+        <SectionTitle title="브랜드별 월별 목표 vs 실적" />
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={th}>브랜드</th>
-                <th style={th}>발굴 담당자</th>
-                <th style={th}>관리 담당자</th>
-                <th style={{ ...th, textAlign: 'center' }}>구분</th>
-                {MONTHS.map(m => (
-                  <th key={m} style={{ ...th, textAlign: 'center', minWidth: 56 }}>{m}</th>
-                ))}
-                <th style={{ ...th, textAlign: 'center', background: '#eff6ff' }}>Total</th>
+              <tr>
+                <th style={thLeft}>브랜드</th>
+                <th style={thLeft}>발굴</th>
+                <th style={thLeft}>관리</th>
+                <th style={th}>구분</th>
+                {MONTHS.map(m => <th key={m} style={{ ...th, minWidth: 50 }}>{m}</th>)}
+                <th style={{ ...th, background: '#f9fafb' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {BRANDS_MOCK.map((b, i) => (
                 <Fragment key={b.name}>
-                  <tr style={{ borderTop: i > 0 ? '2px solid #e5e7eb' : 'none' }}>
-                    <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{b.name}</td>
+                  <tr style={{ borderTop: i > 0 ? '1px solid #e5e7eb' : 'none' }}>
+                    <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle', color: '#111' }}>{b.name}</td>
                     <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.discoverer}</td>
                     <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.manager}</td>
-                    <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>목표</td>
-                    <MonthRow values={b.targets} isActual={false} targets={b.targets} />
+                    <td style={{ ...cellNum, fontSize: 11, color: '#9ca3af' }}>목표</td>
+                    <MonthRow values={b.targets} muted />
                   </tr>
                   <tr>
-                    <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
-                    <MonthRow values={b.actuals} isActual={true} targets={b.targets} />
+                    <td style={{ ...cellNum, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>실적</td>
+                    <MonthRow values={b.actuals} bold />
                   </tr>
                 </Fragment>
               ))}
 
-              {/* Total 행 */}
-              <tr style={{ borderTop: '3px solid #2563eb', background: '#f9fafb' }}>
-                <td colSpan={3} rowSpan={2} style={{ ...td, fontWeight: 700, fontSize: 14, color: '#2563eb', textAlign: 'center', verticalAlign: 'middle' }}>
+              {/* Total */}
+              <tr style={{ borderTop: '2px solid #d1d5db', background: '#f9fafb' }}>
+                <td colSpan={3} rowSpan={2} style={{ ...td, fontWeight: 700, textAlign: 'center', color: '#111', verticalAlign: 'middle' }}>
                   Total
                 </td>
-                <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 700 }}>목표</td>
-                <MonthRow values={grandTargets} isActual={false} targets={grandTargets} totalBg="#bfdbfe" />
+                <td style={{ ...cellNum, fontSize: 11, color: '#9ca3af' }}>목표</td>
+                <MonthRow values={grandTargets} muted totalBg="#f3f4f6" />
               </tr>
               <tr style={{ background: '#f9fafb' }}>
-                <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
-                <MonthRow values={grandActuals} isActual={true} targets={grandTargets} />
+                <td style={{ ...cellNum, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>실적</td>
+                <MonthRow values={grandActuals} bold totalBg="#f3f4f6" />
               </tr>
             </tbody>
           </table>
@@ -238,112 +208,86 @@ export default function BrandsPage() {
       </div>
 
       {/* 테이블 2: 담당자별 */}
-      <div style={{ ...card, marginBottom: 20 }}>
+      <div style={card}>
         <SectionTitle
-          emoji="👤"
-          title="담당자별 월별 합계"
-          hint="각 담당자가 맡은 브랜드들의 목표 / 실적 합산"
+          title="담당자별 합계"
+          hint="2개 이상 브랜드를 맡은 담당자는 행 클릭 시 펼침"
           action={
-            <div style={{ display: 'flex', gap: 6 }}>
-              <ToggleBtn active={managerMode === 'discoverer'} onClick={() => switchMode('discoverer')}>
-                🔍 발굴 담당자
-              </ToggleBtn>
-              <ToggleBtn active={managerMode === 'manager'} onClick={() => switchMode('manager')}>
-                📋 관리 담당자
-              </ToggleBtn>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <ToggleBtn active={managerMode === 'discoverer'} onClick={() => switchMode('discoverer')}>발굴 담당자</ToggleBtn>
+              <ToggleBtn active={managerMode === 'manager'} onClick={() => switchMode('manager')}>관리 담당자</ToggleBtn>
             </div>
           }
         />
 
-        <div style={{
-          padding: '8px 12px', marginBottom: 8, background: '#fffbeb',
-          border: '1px solid #fde68a', borderRadius: 6,
-          fontSize: 12, color: '#78350f',
-        }}>
-          💡 <strong>2개 이상 브랜드</strong>를 맡은 담당자는 행 클릭 시 브랜드별 내역이 펼쳐져요
-        </div>
-
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ ...th, width: 28 }}></th>
-                <th style={th}>{managerMode === 'discoverer' ? '발굴' : '관리'} 담당자</th>
-                <th style={th}>담당 브랜드</th>
-                <th style={{ ...th, textAlign: 'center' }}>구분</th>
-                {MONTHS.map(m => (
-                  <th key={m} style={{ ...th, textAlign: 'center', minWidth: 56 }}>{m}</th>
-                ))}
-                <th style={{ ...th, textAlign: 'center', background: '#eff6ff' }}>Total</th>
+              <tr>
+                <th style={{ ...th, width: 24 }}></th>
+                <th style={thLeft}>담당자</th>
+                <th style={thLeft}>담당 브랜드</th>
+                <th style={th}>구분</th>
+                {MONTHS.map(m => <th key={m} style={{ ...th, minWidth: 50 }}>{m}</th>)}
+                <th style={{ ...th, background: '#f9fafb' }}>Total</th>
               </tr>
             </thead>
             <tbody>
               {byManager.map((mgr, i) => {
-                const hasMultiple = mgr.brands.length >= 2;
-                const isExpanded = expandedMgr === mgr.name;
-                const onClick = hasMultiple
-                  ? () => setExpandedMgr(isExpanded ? null : mgr.name)
-                  : undefined;
+                const multi = mgr.brands.length >= 2;
+                const open = expandedMgr === mgr.name;
+                const onClick = multi ? () => setExpandedMgr(open ? null : mgr.name) : undefined;
                 return (
                   <Fragment key={mgr.name}>
-                    {/* 담당자 요약 행 (목표) */}
                     <tr
                       onClick={onClick}
                       style={{
-                        borderTop: i > 0 ? '2px solid #e5e7eb' : 'none',
-                        cursor: hasMultiple ? 'pointer' : 'default',
-                        background: isExpanded ? '#eff6ff' : 'transparent',
+                        borderTop: i > 0 ? '1px solid #e5e7eb' : 'none',
+                        cursor: multi ? 'pointer' : 'default',
                       }}
                     >
                       <td rowSpan={2} style={{ ...td, textAlign: 'center', color: '#9ca3af', verticalAlign: 'middle' }}>
-                        {hasMultiple ? (isExpanded ? '▼' : '▶') : ''}
+                        {multi ? (open ? '−' : '+') : ''}
                       </td>
-                      <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{mgr.name}</td>
-                      <td rowSpan={2} style={{ ...td, fontSize: 11, color: '#6b7280', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span>{mgr.brands.join(', ')}</span>
-                          {hasMultiple && (
-                            <span style={{
-                              fontSize: 10, padding: '2px 6px', borderRadius: 8,
-                              background: '#dbeafe', color: '#1e40af', fontWeight: 700,
-                            }}>+{mgr.brands.length - 1}</span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{mgr.brands.length}개 브랜드</div>
+                      <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle', color: '#111' }}>{mgr.name}</td>
+                      <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>
+                        {mgr.brands.join(', ')}
+                        <span style={{ marginLeft: 6, color: '#9ca3af', fontSize: 11 }}>· {mgr.brands.length}개</span>
                       </td>
-                      <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 700, background: '#f9fafb' }}>합계 (목표)</td>
-                      <MonthRow values={mgr.targets} isActual={false} targets={mgr.targets} />
+                      <td style={{ ...cellNum, fontSize: 11, color: '#9ca3af' }}>목표</td>
+                      <MonthRow values={mgr.targets} muted />
                     </tr>
                     <tr
                       onClick={onClick}
-                      style={{
-                        cursor: hasMultiple ? 'pointer' : 'default',
-                        background: isExpanded ? '#eff6ff' : 'transparent',
-                      }}
+                      style={{ cursor: multi ? 'pointer' : 'default' }}
                     >
-                      <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700, background: '#f9fafb' }}>합계 (실적)</td>
-                      <MonthRow values={mgr.actuals} isActual={true} targets={mgr.targets} />
+                      <td style={{ ...cellNum, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>실적</td>
+                      <MonthRow values={mgr.actuals} bold />
                     </tr>
 
-                    {/* 펼쳐진 브랜드별 행 */}
-                    {isExpanded && mgr.brandDetails.map((bd, bi) => (
+                    {open && mgr.brandDetails.map(bd => (
                       <Fragment key={`${mgr.name}-${bd.name}`}>
-                        <tr style={{ background: '#fafbfc', borderTop: bi === 0 ? '1px dashed #93c5fd' : '1px solid #f3f4f6' }}>
+                        <tr style={{ background: '#fafafa' }}>
                           <td></td>
                           <td colSpan={2} rowSpan={2} style={{
-                            ...td, fontSize: 12, color: '#374151', verticalAlign: 'middle',
+                            ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle',
                             paddingLeft: 24,
                           }}>
-                            <span style={{ color: '#9ca3af', marginRight: 6 }}>└</span>
-                            <span style={{ fontWeight: 600 }}>{bd.name}</span>
+                            {bd.name}
                           </td>
-                          <td style={{ ...cellBase, fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>목표</td>
-                          <MonthRow values={bd.targets} isActual={false} targets={bd.targets} />
+                          <td style={{ ...cellNum, fontSize: 11, color: '#9ca3af', background: '#fafafa' }}>목표</td>
+                          {bd.targets.map((v, j) => (
+                            <td key={j} style={{ ...cellNum, color: '#9ca3af', background: '#fafafa' }}>{v}</td>
+                          ))}
+                          <td style={{ ...cellNum, background: '#f3f4f6', color: '#9ca3af', fontWeight: 600 }}>{sum(bd.targets)}</td>
                         </tr>
-                        <tr style={{ background: '#fafbfc' }}>
+                        <tr style={{ background: '#fafafa' }}>
                           <td></td>
-                          <td style={{ ...cellBase, fontSize: 10, color: '#6b7280', fontWeight: 600 }}>실적</td>
-                          <MonthRow values={bd.actuals} isActual={true} targets={bd.targets} />
+                          <td style={{ ...cellNum, fontSize: 11, color: '#6b7280', fontWeight: 600, background: '#fafafa' }}>실적</td>
+                          {bd.actuals.map((v, j) => (
+                            <td key={j} style={{ ...cellNum, fontWeight: 600, background: '#fafafa' }}>{v}</td>
+                          ))}
+                          <td style={{ ...cellNum, background: '#f3f4f6', fontWeight: 700 }}>{sum(bd.actuals)}</td>
                         </tr>
                       </Fragment>
                     ))}
@@ -354,20 +298,19 @@ export default function BrandsPage() {
           </table>
         </div>
       </div>
-
-      {/* 안내문 */}
-      <div style={{
-        padding: 16, background: '#fffbeb', border: '1px solid #fde68a',
-        borderRadius: 12, fontSize: 13, color: '#78350f', lineHeight: 1.6,
-      }}>
-        ℹ️ <strong>현재 mock 데이터 — 향후 실데이터 연동 계획:</strong>
-        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-          <li>🏷️ <strong>브랜드 목록 + 발굴/관리 담당자</strong> → 와이어드민 + 준비 중인 별도 사이트에서 자동 동기화</li>
-          <li>🎯 <strong>월별 목표</strong> → 사업개발팀 <strong>분기별</strong> 설정 (입력 UI 추후 추가)</li>
-          <li>💰 <strong>월별 실적</strong> → 와이어드민 API (totalWiredSalesAmount, 백만원 단위)</li>
-          <li>📅 <strong>분기 단위 보기</strong> → 분기로 진행될 가능성이 높아 분기 토글 추후 추가 예정</li>
-        </ul>
-      </div>
     </main>
+  );
+}
+
+// 한 줄 요약 통계
+function Stat({ label, value, unit, muted }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: muted ? '#9ca3af' : '#111' }}>
+        {value}
+        {unit && <span style={{ fontSize: 11, fontWeight: 400, color: '#9ca3af', marginLeft: 2 }}>{unit}</span>}
+      </div>
+    </div>
   );
 }
