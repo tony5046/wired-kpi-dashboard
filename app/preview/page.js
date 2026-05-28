@@ -305,7 +305,9 @@ function PartnerSellersSection({ partnerStats }) {
                 border: '1px solid ' + (isTop ? '#fcd34d' : '#e7e3da'),
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600 }}>💰 2026년 누적매출</div>
+                  <div style={{ fontSize: 11, color: '#6b6b6b', fontWeight: 600 }}>
+                    💰 {p.ytdLabel || '2026년 누적매출'}
+                  </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#37352f' }}>
                     {(p.ytdSales || 0).toLocaleString('ko-KR')}
                     <span style={{ fontSize: 11, fontWeight: 500, color: '#6b6b6b', marginLeft: 2 }}>백만원</span>
