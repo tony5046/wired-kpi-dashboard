@@ -1041,7 +1041,7 @@ export default function Preview() {
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>📊 와이어드 매출 대시보드 v5 — 실데이터</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          매출 기준 = <strong>출고완료(RELEASE_COMPLETE)</strong> · 와이어드민 API + 구글시트(사업개발) 실시간 데이터
+          매출 = <strong>와이어드 매출 (totalWiredSalesAmount)</strong> · 회계 기준 (셀러 수수료 제외)
         </p>
         <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 기존 페이지로</Link>
       </header>

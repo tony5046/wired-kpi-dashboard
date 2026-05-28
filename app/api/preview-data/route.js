@@ -69,12 +69,12 @@ export async function GET() {
     const nextMonthRange = monthToDateRange(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1);
 
     // 병렬 fetch — 와이어드민 3개월치만 (이/저/다음달)
-    // 매출은 RELEASE_COMPLETE(출고완료) 기준 (= 확정 매출)
+    // 매출 = totalWiredSalesAmount (와이어드 회계 기준), 전체 status 포함
     const [sheetData, thisMonthView, lastMonthView, nextMonthView] = await Promise.all([
       getCachedSheets().catch(e => ({ _error: e.message })),
-      getCombinedView(thisMonthRange.startDate, thisMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
-      getCombinedView(lastMonthRange.startDate, lastMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
-      getCombinedView(nextMonthRange.startDate, nextMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
+      getCombinedView(thisMonthRange.startDate, thisMonthRange.endDate).catch(e => ({ _error: e.message })),
+      getCombinedView(lastMonthRange.startDate, lastMonthRange.endDate).catch(e => ({ _error: e.message })),
+      getCombinedView(nextMonthRange.startDate, nextMonthRange.endDate).catch(e => ({ _error: e.message })),
     ]);
 
     // GSD 연도별 비교 (트렌드 + YTD/QTD 계산 기준)
@@ -128,7 +128,7 @@ export async function GET() {
         name: displayName,
         aliases,    // 디버깅용
         ytdSales: toMillion(recentTwoMonthsWon),
-        ytdLabel: '최근 2개월 출고완료',
+        ytdLabel: '최근 2개월 누적',
         lastMonth: {
           sales: toMillion(last.actualSales),
           marketCount: last.marketCount,
