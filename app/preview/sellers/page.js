@@ -77,7 +77,7 @@ function PageHeader({ sellers }) {
         </h1>
         <p style={{ fontSize: 13, color: C.muted, margin: '6px 0 0' }}>
           셀러별 월별 목표 vs 실적 · 단위: 백만원
-          <span style={{ marginLeft: 8, padding: '2px 8px', background: C.bg, border: `1px solid ${C.divider}`, borderRadius: 4, fontSize: 11, color: C.muted }}>mock 데이터</span>
+          <span style={{ marginLeft: 8, padding: '2px 8px', background: C.surfaceMuted, border: `1px solid ${C.divider}`, borderRadius: 4, fontSize: 11, color: C.muted }}>mock 데이터</span>
         </p>
       </header>
 
@@ -217,10 +217,22 @@ function DesignA({ sellers }) {
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <div style={{ width: 4, height: 18, background: C.indigo, borderRadius: 2 }} />
-        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>셀러별 월별 목표 vs 실적</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>셀러별 월별 매출·이익·공구건수</div>
         <div style={{ flex: 1 }} />
-        <div style={{ fontSize: 11, color: C.muted }}>
-          💡 셀러 행 클릭 → 마켓 상세 펼침
+        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.muted, alignItems: 'center' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, background: C.faint, borderRadius: 1, opacity: 0.5 }} />매출 목표
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, background: C.indigo, borderRadius: 1 }} />매출 실적
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, background: C.emerald, borderRadius: 1 }} />영업이익
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, background: C.muted, borderRadius: 1 }} />공구건수
+          </span>
+          <span style={{ marginLeft: 8, color: C.faint }}>· 행 클릭 → 마켓 상세</span>
         </div>
       </div>
 
@@ -231,7 +243,7 @@ function DesignA({ sellers }) {
               <th style={{ ...th, width: 24 }}></th>
               <th style={thLeft}>셀러</th>
               <th style={thLeft}>담당자</th>
-              <th style={th}>구분</th>
+              <th style={{ ...th, textAlign: 'left', paddingLeft: 12 }}>지표</th>
               {MONTHS.map((m, i) => (
                 <th key={m} style={{ ...th, minWidth: 54 }}>
                   {m}
@@ -240,8 +252,8 @@ function DesignA({ sellers }) {
                   )}
                 </th>
               ))}
-              <th style={{ ...th, background: C.bg }}>Total</th>
-              <th style={{ ...th, background: C.bg, minWidth: 90 }}>달성률</th>
+              <th style={{ ...th, background: C.surfaceMuted }}>Total</th>
+              <th style={{ ...th, background: C.surfaceMuted, minWidth: 90 }}>달성률</th>
             </tr>
           </thead>
           <tbody>
@@ -252,28 +264,48 @@ function DesignA({ sellers }) {
               const acc = rateAccent(rate);
               const isOpen = expanded === s.name;
 
+              // 월별 영업이익 + 공구건수 (marketsByMonth로부터 집계)
+              const profits = s.marketsByMonth.map(ms =>
+                ms.reduce((acc, m) => acc + (m.profit || 0), 0)
+              );
+              const marketCounts = s.marketsByMonth.map(ms => ms.length);
+              const totalProfit = sum(profits);
+              const totalMarkets = sum(marketCounts);
+
+              const clickRow = () => setExpanded(isOpen ? null : s.name);
+              const rowBg = isOpen ? C.indigoSoft : 'transparent';
+
+              // 행 4개 공통 스타일
+              const sharedRowStyle = {
+                cursor: 'pointer',
+                background: rowBg,
+              };
+
               return (
                 <Fragment key={s.name}>
+                  {/* Row 1: 매출 목표 — 셀러 / 담당자 / 달성률 합쳐서 rowSpan=4 */}
                   <tr
-                    onClick={() => setExpanded(isOpen ? null : s.name)}
+                    onClick={clickRow}
                     style={{
-                      borderTop: i > 0 ? `1px solid ${C.divider}` : 'none',
-                      cursor: 'pointer',
-                      background: isOpen ? C.indigoSoft : 'transparent',
+                      borderTop: i > 0 ? `2px solid ${C.divider}` : 'none',
+                      ...sharedRowStyle,
                     }}
                   >
-                    <td rowSpan={2} style={{ ...td, textAlign: 'center', color: C.faint, verticalAlign: 'middle' }}>
+                    <td rowSpan={4} style={{ ...td, textAlign: 'center', color: C.faint, verticalAlign: 'middle' }}>
                       {isOpen ? '−' : '+'}
                     </td>
-                    <td rowSpan={2} style={{ ...td, fontWeight: 600, fontSize: 14, verticalAlign: 'middle' }}>
+                    <td rowSpan={4} style={{ ...td, fontWeight: 600, fontSize: 14, verticalAlign: 'middle' }}>
                       {s.name}
                       {PARTNERS.has(s.name) && <PartnerTag />}
                     </td>
-                    <td rowSpan={2} style={{ ...td, fontSize: 12, color: C.muted, verticalAlign: 'middle' }}>{s.manager}</td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.faint, fontWeight: 500 }}>목표</td>
+                    <td rowSpan={4} style={{ ...td, fontSize: 12, color: C.muted, verticalAlign: 'middle' }}>{s.manager}</td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.faint, fontWeight: 500, textAlign: 'left', paddingLeft: 8 }}>
+                      <span style={{ display: 'inline-block', width: 6, height: 6, background: C.faint, borderRadius: 1, marginRight: 6, verticalAlign: 'middle', opacity: 0.5 }} />
+                      매출 목표
+                    </td>
                     {s.targets.map((v, j) => <td key={j} style={{ ...cellNum, color: C.faint }}>{v}</td>)}
-                    <td style={{ ...cellNum, fontWeight: 600, color: C.faint, background: C.bg }}>{tTotal}</td>
-                    <td rowSpan={2} style={{ ...cellNum, verticalAlign: 'middle', background: C.bg }}>
+                    <td style={{ ...cellNum, fontWeight: 600, color: C.faint, background: C.surfaceMuted }}>{tTotal}</td>
+                    <td rowSpan={4} style={{ ...cellNum, verticalAlign: 'middle', background: C.surfaceMuted }}>
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '4px 10px', borderRadius: 8,
@@ -288,17 +320,56 @@ function DesignA({ sellers }) {
                       </div>
                     </td>
                   </tr>
-                  <tr
-                    onClick={() => setExpanded(isOpen ? null : s.name)}
-                    style={{ cursor: 'pointer', background: isOpen ? C.indigoSoft : 'transparent' }}
-                  >
-                    <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700 }}>실적</td>
+
+                  {/* Row 2: 매출 실적 */}
+                  <tr onClick={clickRow} style={sharedRowStyle}>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, textAlign: 'left', paddingLeft: 8 }}>
+                      <span style={{ display: 'inline-block', width: 6, height: 6, background: C.indigo, borderRadius: 1, marginRight: 6, verticalAlign: 'middle' }} />
+                      매출 실적
+                    </td>
                     {s.actuals.map((v, j) => (
-                      <td key={j} style={{ ...cellNum, fontWeight: 600, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint }}>
+                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint }}>
                         {COMPLETED_MONTHS.has(j) ? v : '-'}
                       </td>
                     ))}
-                    <td style={{ ...cellNum, fontWeight: 700, background: C.bg, color: C.ink }}>{aTotal}</td>
+                    <td style={{ ...cellNum, fontWeight: 700, background: C.surfaceMuted, color: C.ink }}>{aTotal}</td>
+                  </tr>
+
+                  {/* Row 3: 영업이익 */}
+                  <tr onClick={clickRow} style={sharedRowStyle}>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.emerald, fontWeight: 700, textAlign: 'left', paddingLeft: 8 }}>
+                      <span style={{ display: 'inline-block', width: 6, height: 6, background: C.emerald, borderRadius: 1, marginRight: 6, verticalAlign: 'middle' }} />
+                      영업이익
+                    </td>
+                    {profits.map((v, j) => (
+                      <td key={j} style={{ ...cellNum, color: COMPLETED_MONTHS.has(j) ? C.emerald : C.faint, fontWeight: 600 }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
+                    ))}
+                    <td style={{ ...cellNum, fontWeight: 700, background: C.surfaceMuted, color: C.emerald }}>{totalProfit}</td>
+                  </tr>
+
+                  {/* Row 4: 공구건수 */}
+                  <tr onClick={clickRow} style={sharedRowStyle}>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, textAlign: 'left', paddingLeft: 8 }}>
+                      <span style={{ display: 'inline-block', width: 6, height: 6, background: C.muted, borderRadius: 1, marginRight: 6, verticalAlign: 'middle' }} />
+                      공구건수
+                    </td>
+                    {marketCounts.map((v, j) => {
+                      const planned = !COMPLETED_MONTHS.has(j);
+                      return (
+                        <td key={j} style={{ ...cellNum, color: planned ? C.amber : C.muted, fontSize: 12, fontWeight: 500 }}>
+                          {v > 0 ? (
+                            <>
+                              {v}<span style={{ fontSize: 10, marginLeft: 1 }}>건{planned ? '예정' : ''}</span>
+                            </>
+                          ) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td style={{ ...cellNum, fontWeight: 700, background: C.surfaceMuted, color: C.muted, fontSize: 12 }}>
+                      {totalMarkets}<span style={{ fontSize: 10 }}>건</span>
+                    </td>
                   </tr>
 
                   {/* 펼침: 월별 마켓 상세 */}
@@ -314,30 +385,68 @@ function DesignA({ sellers }) {
             })}
 
             {/* Total */}
-            <tr style={{ borderTop: `2px solid ${C.indigo}`, background: C.indigoSoft }}>
-              <td></td>
-              <td colSpan={2} rowSpan={2} style={{
-                ...td, fontWeight: 700, fontSize: 14,
-                textAlign: 'center', verticalAlign: 'middle', color: C.indigo,
-                background: C.indigoSoft,
-              }}>Total</td>
-              <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 600, background: C.indigoSoft }}>목표</td>
-              {grandT.map((v, j) => <td key={j} style={{ ...cellNum, color: C.muted, background: C.indigoSoft }}>{v}</td>)}
-              <td style={{ ...cellNum, fontWeight: 700, color: C.muted, background: C.indigoMid }}>{sum(grandT)}</td>
-              <td rowSpan={2} style={{ ...cellNum, verticalAlign: 'middle', background: C.indigoMid, fontWeight: 800, fontSize: 16, color: C.indigo }}>
-                {grandRate.toFixed(0)}%
-              </td>
-            </tr>
-            <tr style={{ background: C.indigoSoft }}>
-              <td></td>
-              <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft }}>실적</td>
-              {grandA.map((v, j) => (
-                <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint, background: C.indigoSoft }}>
-                  {COMPLETED_MONTHS.has(j) ? v : '-'}
-                </td>
-              ))}
-              <td style={{ ...cellNum, fontWeight: 800, color: C.indigo, background: C.indigoMid, fontSize: 14 }}>{sum(grandA)}</td>
-            </tr>
+            {(() => {
+              // Total 영업이익 + 공구건수 집계
+              const grandProfits = MONTHS.map((_, j) =>
+                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.reduce((p, m) => p + (m.profit || 0), 0) || 0), 0)
+              );
+              const grandMarkets = MONTHS.map((_, j) =>
+                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.length || 0), 0)
+              );
+              return (
+                <>
+                  <tr style={{ borderTop: `3px solid ${C.indigo}`, background: C.indigoSoft }}>
+                    <td></td>
+                    <td colSpan={2} rowSpan={4} style={{
+                      ...td, fontWeight: 700, fontSize: 14,
+                      textAlign: 'center', verticalAlign: 'middle', color: C.indigo,
+                      background: C.indigoSoft,
+                    }}>Total</td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 목표</td>
+                    {grandT.map((v, j) => <td key={j} style={{ ...cellNum, color: C.muted, background: C.indigoSoft }}>{v}</td>)}
+                    <td style={{ ...cellNum, fontWeight: 700, color: C.muted, background: C.indigoMid }}>{sum(grandT)}</td>
+                    <td rowSpan={4} style={{ ...cellNum, verticalAlign: 'middle', background: C.indigoMid, fontWeight: 800, fontSize: 18, color: C.indigo }}>
+                      {grandRate.toFixed(0)}%
+                    </td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 실적</td>
+                    {grandA.map((v, j) => (
+                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint, background: C.indigoSoft }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
+                    ))}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.indigo, background: C.indigoMid, fontSize: 14 }}>{sum(grandA)}</td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.emerald, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>영업이익</td>
+                    {grandProfits.map((v, j) => (
+                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.emerald : C.faint, background: C.indigoSoft }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
+                    ))}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.emerald, background: C.indigoMid, fontSize: 14 }}>{sum(grandProfits)}</td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>공구건수</td>
+                    {grandMarkets.map((v, j) => {
+                      const planned = !COMPLETED_MONTHS.has(j);
+                      return (
+                        <td key={j} style={{ ...cellNum, fontWeight: 700, color: planned ? C.amber : C.muted, background: C.indigoSoft, fontSize: 12 }}>
+                          {v}<span style={{ fontSize: 9, marginLeft: 1 }}>건{planned ? '예' : ''}</span>
+                        </td>
+                      );
+                    })}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.muted, background: C.indigoMid, fontSize: 13 }}>
+                      {sum(grandMarkets)}<span style={{ fontSize: 10 }}>건</span>
+                    </td>
+                  </tr>
+                </>
+              );
+            })()}
           </tbody>
         </table>
       </div>
