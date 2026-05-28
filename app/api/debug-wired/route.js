@@ -67,24 +67,37 @@ export async function GET(request) {
     result.tests.markets = { error: e.message, stack: e.stack?.split('\n').slice(0, 3) };
   }
 
-  // Test 3: thisYear range (heaviest)
-  try {
-    const t1 = Date.now();
-    const url = `${base}/order/orders?durationType=CREATED_AT&startDate=2026-01-01&endDate=2026-12-31&offset=0&size=5000`;
-    const res = await fetch(url, {
-      headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
-      cache: 'no-store',
-    });
-    const data = await res.json();
-    result.tests.thisYearOrdersPage1 = {
-      status: res.status,
-      timeMs: Date.now() - t1,
-      ok: res.ok,
-      pagination: data?.pagination,
-      dataCount: data?.data?.length,
-    };
-  } catch (e) {
-    result.tests.thisYearOrdersPage1 = { error: e.message };
+  // Test 3: 다양한 기간으로 테스트해서 어디까지 허용되는지 확인
+  const ranges = [
+    { name: '1개월(5월)', start: '2026-05-01', end: '2026-05-31' },
+    { name: '2개월(4-5월)', start: '2026-04-01', end: '2026-05-31' },
+    { name: '3개월(Q2)', start: '2026-04-01', end: '2026-06-30' },
+    { name: '6개월(상반기)', start: '2026-01-01', end: '2026-06-30' },
+    { name: '12개월(전체)', start: '2026-01-01', end: '2026-12-31' },
+  ];
+
+  for (const r of ranges) {
+    try {
+      const t1 = Date.now();
+      const url = `${base}/order/orders?durationType=CREATED_AT&startDate=${r.start}&endDate=${r.end}&offset=0&size=100`;
+      const res = await fetch(url, {
+        headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const bodyText = await res.text();
+      let parsed = null;
+      try { parsed = JSON.parse(bodyText); } catch {}
+      result.tests[`range_${r.name}`] = {
+        status: res.status,
+        timeMs: Date.now() - t1,
+        ok: res.ok,
+        pagination: parsed?.pagination,
+        dataCount: parsed?.data?.length,
+        errorBody: !res.ok ? bodyText.slice(0, 500) : undefined,
+      };
+    } catch (e) {
+      result.tests[`range_${r.name}`] = { error: e.message };
+    }
   }
 
   return NextResponse.json(result, { status: 200 });
