@@ -9,20 +9,44 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const PARTNER_SELLER_NAMES = [
-  '오인스', '달빛언니', '선선부부하우스', '김영은', '모노마켓', '풀킴',
-];
+// 파트너 셀러 — 표시 이름 → 와이어드민에 등록된 실제 이름들 (alias)
+// 노션 페이지 제목은 친근한 이름인데, 와이어드민에는 다르게 등록된 경우가 있어서 매핑.
+const PARTNER_ALIASES = {
+  '오인스':         ['오인스'],
+  '달빛언니':       ['달빛언니', '달빛'],
+  '선선부부하우스': ['선선부부하우스'],
+  '김영은':         ['김영은', '김영은마켓'],
+  '모노마켓':       ['모노마켓'],
+  '풀킴':           ['풀킴', '풀킴님'],
+};
+const PARTNER_DISPLAY_NAMES = Object.keys(PARTNER_ALIASES);
+
+// 와이어드민 셀러명 → 표시 이름 매핑 (역방향)
+const ALIAS_TO_DISPLAY = {};
+for (const [display, aliases] of Object.entries(PARTNER_ALIASES)) {
+  for (const a of aliases) ALIAS_TO_DISPLAY[a] = display;
+}
+
+// 셀러명이 파트너인지 (alias 포함 체크)
+function isPartnerSeller(name) {
+  return !!ALIAS_TO_DISPLAY[name];
+}
 
 const toMillion = (won) => Math.round((won || 0) / 1_000_000);
 
-function sellerStats(sellersList, name) {
+// 셀러 통계: alias 목록 중 하나라도 매칭되면 합산
+function sellerStatsByAliases(sellersList, aliases) {
   if (!Array.isArray(sellersList)) return { actualSales: 0, estimatedSales: 0, marketCount: 0 };
-  const found = sellersList.find(s => s.name === name);
-  return {
-    actualSales: found?.actualSales || 0,
-    estimatedSales: found?.estimatedSales || 0,
-    marketCount: found?.marketCount || 0,
-  };
+  let actualSales = 0, estimatedSales = 0, marketCount = 0;
+  for (const a of aliases) {
+    const found = sellersList.find(s => s.name === a);
+    if (found) {
+      actualSales += found.actualSales || 0;
+      estimatedSales += found.estimatedSales || 0;
+      marketCount += found.marketCount || 0;
+    }
+  }
+  return { actualSales, estimatedSales, marketCount };
 }
 
 export async function GET() {
@@ -45,11 +69,12 @@ export async function GET() {
     const nextMonthRange = monthToDateRange(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1);
 
     // 병렬 fetch — 와이어드민 3개월치만 (이/저/다음달)
+    // 매출은 RELEASE_COMPLETE(출고완료) 기준 (= 확정 매출)
     const [sheetData, thisMonthView, lastMonthView, nextMonthView] = await Promise.all([
       getCachedSheets().catch(e => ({ _error: e.message })),
-      getCombinedView(thisMonthRange.startDate, thisMonthRange.endDate).catch(e => ({ _error: e.message })),
-      getCombinedView(lastMonthRange.startDate, lastMonthRange.endDate).catch(e => ({ _error: e.message })),
-      getCombinedView(nextMonthRange.startDate, nextMonthRange.endDate).catch(e => ({ _error: e.message })),
+      getCombinedView(thisMonthRange.startDate, thisMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
+      getCombinedView(lastMonthRange.startDate, lastMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
+      getCombinedView(nextMonthRange.startDate, nextMonthRange.endDate, { releasedOnly: true }).catch(e => ({ _error: e.message })),
     ]);
 
     // GSD 연도별 비교 (트렌드 + YTD/QTD 계산 기준)
@@ -91,18 +116,19 @@ export async function GET() {
     const sellers = thisMonthView?.sellers || [];
     const brands = thisMonthView?.brands || [];
 
-    // 파트너 통계
+    // 파트너 통계 — alias 목록을 모두 합산해서 찾기
     // ytdSales는 와이어드민 1년 호출이 너무 무거워서 일단 "저번달+이번달 누적"으로 대체
-    // (1년 누적은 추후 cron이 월별로 미리 캐시 채워두는 방식으로 개선 예정)
-    const partnerStats = PARTNER_SELLER_NAMES.map(name => {
-      const last = sellerStats(lastMonthView?.sellers, name);
-      const cur = sellerStats(thisMonthView?.sellers, name);
-      const next = sellerStats(nextMonthView?.sellers, name);
+    const partnerStats = PARTNER_DISPLAY_NAMES.map(displayName => {
+      const aliases = PARTNER_ALIASES[displayName];
+      const last = sellerStatsByAliases(lastMonthView?.sellers, aliases);
+      const cur = sellerStatsByAliases(thisMonthView?.sellers, aliases);
+      const next = sellerStatsByAliases(nextMonthView?.sellers, aliases);
       const recentTwoMonthsWon = (last.actualSales || 0) + (cur.actualSales || 0);
       return {
-        name,
+        name: displayName,
+        aliases,    // 디버깅용
         ytdSales: toMillion(recentTwoMonthsWon),
-        ytdLabel: '최근 2개월 누적',   // UI에 표시할 라벨
+        ytdLabel: '최근 2개월 출고완료',
         lastMonth: {
           sales: toMillion(last.actualSales),
           marketCount: last.marketCount,
@@ -133,12 +159,15 @@ export async function GET() {
       yearProgress,
       quarterProgress,
 
-      ytdSource: 'GSD trend sum (사업개발 시트)',  // YTD 출처 명시
+      salesMetric: 'RELEASE_COMPLETE',  // 출고완료된 매출만 (확정 매출)
+      ytdSource: 'GSD trend sum (사업개발 시트)',
 
       marketsList: marketsList.map(m => ({
         id: m.id,
         name: m.name,
-        sellerName: m.sellerName,
+        // 셀러명을 표시 이름으로 normalize (예: '달빛' → '달빛언니')
+        sellerName: ALIAS_TO_DISPLAY[m.sellerName] || m.sellerName,
+        sellerNameRaw: m.sellerName,  // 원본 이름 (디버깅용)
         brandName: m.brandName,
         managerName: m.managerName,
         status: m.status,
@@ -153,17 +182,20 @@ export async function GET() {
         csRate: null,
         deliveryRate: null,
         exposure: null,
+        isPartner: isPartnerSeller(m.sellerName),
       })),
 
       sellers: sellers.map(s => ({
-        name: s.name,
+        // 셀러명도 표시 이름으로
+        name: ALIAS_TO_DISPLAY[s.name] || s.name,
+        nameRaw: s.name,
         manager: s.manager,
         sales: toMillion(s.actualSales),
         estimatedSales: toMillion(s.estimatedSales),
         marketCount: s.marketCount,
         orderCount: s.uniqueCustomers,
         achievementRate: s.achievementRate,
-        isPartner: PARTNER_SELLER_NAMES.includes(s.name),
+        isPartner: isPartnerSeller(s.name),
       })),
 
       brands: brands.map(b => ({
