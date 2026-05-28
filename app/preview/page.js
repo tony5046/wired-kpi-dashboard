@@ -195,7 +195,7 @@ function TrendChart({ trend, monthTargetAvg, yearTarget, quarterTarget, ytdSales
       <SectionTitle
         emoji="📈"
         title="3년 월별 매출 추이"
-        hint="2024 회색 / 2025 노랑 / 2026 파랑 · 가로 점선 = 월 평균 목표 · 데이터는 사업개발 시트에서 자동 동기화"
+        hint="2024 회색 / 2025 노랑 / 2026 파랑 · 이번 달은 와이어드민 실시간 (정산 시점 차이로 사업개발 시트와 다를 수 있음)"
       />
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 16 }}>
         <div style={{ height: 380 }}>
@@ -1041,7 +1041,7 @@ export default function Preview() {
       <header style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, margin: 0 }}>📊 와이어드 매출 대시보드 v5 — 실데이터</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          매출 = <strong>와이어드 매출 (totalWiredSalesAmount)</strong> · 회계 기준 (셀러 수수료 제외)
+          매출 = <strong>와이어드 매출 (totalWiredSalesAmount)</strong> · 지난 달까지는 사업개발 시트 (정산 기준 확정값) · <strong style={{ color: '#2563eb' }}>이번 달은 와이어드민 실시간</strong>
         </p>
         <Link href="/query" style={{ fontSize: 13, color: '#2563eb', marginTop: 8, display: 'inline-block' }}>← 기존 페이지로</Link>
       </header>

@@ -80,28 +80,41 @@ export async function GET() {
     // GSD 연도별 비교 (트렌드 + YTD/QTD 계산 기준)
     const yearly = sheetData?.yearly && !sheetData.yearly._error ? sheetData.yearly : null;
 
-    // 트렌드 차트
+    // 현재 월(이번달) 와이어드 매출 from API
+    const currentMonthApiSales = toMillion(thisMonthView?.orders?.total?.sales || 0);
+
+    // 트렌드 차트 — 옵션 B 하이브리드:
+    //   1~이번월 직전: 사업개발 시트 (정산 기준, 확정)
+    //   이번월 (진행 중): 와이어드민 API 실시간 (totalWiredSalesAmount)
+    //   다음달 이후: null
     const trend = (yearly?.months || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']).map((m, i) => {
       const v2024 = toMillion(yearly?.y2024Sales?.[i] || 0);
       const v2025 = toMillion(yearly?.y2025Sales?.[i] || 0);
-      const v2026 = toMillion(yearly?.y2026Sales?.[i] || 0);
+      const gsd2026 = toMillion(yearly?.y2026Sales?.[i] || 0);
+      let v2026 = null;
+      let v2026Source = null;
+      if (i < month - 1) {
+        // 이번월 이전: GSD
+        v2026 = gsd2026 || null;
+        v2026Source = 'GSD';
+      } else if (i === month - 1) {
+        // 이번월(진행중): API 실시간 (없으면 GSD fallback)
+        v2026 = currentMonthApiSales || gsd2026 || null;
+        v2026Source = currentMonthApiSales > 0 ? 'API' : 'GSD';
+      }
       return {
         month: m,
         '2024': v2024 || null,
         '2025': v2025 || null,
-        '2026': i < month ? (v2026 || null) : null,
+        '2026': v2026,
+        _2026Source: v2026Source,
       };
     });
 
-    // ─── YTD/QTD: GSD 트렌드에서 합산 (와이어드민 호출 없이) ───
-    // 트렌드 데이터는 이미 백만원 단위로 변환됨
-    const ytdSales = trend
-      .slice(0, month)
-      .reduce((s, r) => s + (r['2026'] || 0), 0);
+    // ─── YTD/QTD 계산: trend와 동일한 하이브리드 정책으로 ───
+    const ytdSales = trend.slice(0, month).reduce((s, r) => s + (r['2026'] || 0), 0);
     const qStartIdx = (quarter - 1) * 3;
-    const qtdSales = trend
-      .slice(qStartIdx, month)
-      .reduce((s, r) => s + (r['2026'] || 0), 0);
+    const qtdSales = trend.slice(qStartIdx, month).reduce((s, r) => s + (r['2026'] || 0), 0);
 
     // 날짜 진행률
     const daysIntoYear = Math.floor((now - new Date(year, 0, 1)) / (1000 * 60 * 60 * 24)) + 1;
