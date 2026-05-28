@@ -1,363 +1,114 @@
 'use client';
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 
-// 유틸
-function fmt(v) { return (v ?? 0).toLocaleString('ko-KR') + '백만원'; }
+// ─────────────── MOCK 데이터 ───────────────
+// TODO: 향후 와이어드민 + 준비 중인 별도 사이트에서 데이터 가져올 예정
+//
+// 데이터 출처 (계획):
+//   - 브랜드 메타 (발굴/관리 담당자): 준비 중인 사이트 또는 GSD 별도 시트
+//   - 월별 목표:                       사업개발팀 분기별 설정
+//   - 월별 실적:                       와이어드민 API (totalWiredSalesAmount)
+//
+// 단위: 모든 숫자는 백만원
 
+const MONTHS = ['5월', '6월', '7월', '8월', '9월', '10월'];
+
+const BRANDS_MOCK = [
+  {
+    name: '멜리언스',
+    discoverer: '홍만의',
+    manager: '정석호',
+    targets:  [10, 10, 10, 10, 10, 10],
+    actuals:  [ 1,  2,  3,  4,  5,  6],
+  },
+  {
+    name: '오마뎅',
+    discoverer: '홍소의',
+    manager: '박준호',
+    targets:  [20, 20, 20, 20, 20, 20],
+    actuals:  [ 7,  8,  9,  0, 10, 11],
+  },
+  {
+    name: '씨밀렉스',
+    discoverer: '김규민',
+    manager: '이민우',
+    targets:  [10, 10, 10, 10, 10, 10],
+    actuals:  [11,  4, 21, 10,  5,  1],
+  },
+  {
+    name: '금왕',
+    discoverer: '강규성',
+    manager: '김규민',
+    targets:  [20, 20, 20, 20, 20, 20],
+    actuals:  [10, 20, 30,  4,  5,  6],
+  },
+  {
+    name: '올레아',
+    discoverer: '박준호',
+    manager: '강규성',
+    targets:  [10, 10, 10, 10, 10, 10],
+    actuals:  [11, 12, 13, 14, 15, 16],
+  },
+];
+
+// ─────────────── 유틸 ───────────────
+const sum = (arr) => arr.reduce((a, v) => a + v, 0);
+
+// 셀 색상 (실적 vs 목표)
+function rateColor(actual, target) {
+  if (target === 0) return { color: '#9ca3af', bg: 'transparent' };
+  const rate = actual / target;
+  if (rate >= 1.0)  return { color: '#065f46', bg: '#d1fae5' };
+  if (rate >= 0.7)  return { color: '#92400e', bg: '#fef3c7' };
+  if (rate >= 0.3)  return { color: '#9a3412', bg: '#fed7aa' };
+  return { color: '#991b1b', bg: '#fee2e2' };
+}
+
+// ─────────────── 스타일 ───────────────
 const card = {
   padding: 20, background: '#fff',
   border: '1px solid #e5e7eb', borderRadius: 14,
   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
 };
-const th = { padding: '10px 8px', borderBottom: '2px solid #e5e7eb', fontSize: 11, color: '#6b7280', fontWeight: 600, textAlign: 'left' };
-const td = { padding: '10px 8px', borderBottom: '1px solid #f3f4f6', fontSize: 13 };
+const th = {
+  padding: '12px 8px',
+  borderBottom: '2px solid #e5e7eb',
+  fontSize: 11, color: '#6b7280', fontWeight: 600,
+  textAlign: 'left', whiteSpace: 'nowrap',
+};
+const td = {
+  padding: '8px',
+  fontSize: 13,
+  borderBottom: '1px solid #f3f4f6',
+};
+const cellBase = {
+  padding: '8px 6px', textAlign: 'center',
+  borderBottom: '1px solid #f3f4f6',
+  fontSize: 13,
+};
 
-function SectionTitle({ emoji, title, hint }) {
+// ─────────────── 컴포넌트 ───────────────
+function SectionTitle({ emoji, title, hint, action }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{emoji} {title}</h2>
-      {hint && <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>{hint}</p>}
+    <div style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{emoji} {title}</h2>
+        {hint && <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>{hint}</p>}
+      </div>
+      {action}
     </div>
   );
 }
 
-function SortBtn({ active, onClick, children }) {
+function ToggleBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
-      padding: '6px 10px', fontSize: 12, fontWeight: active ? 700 : 500,
+      padding: '8px 14px', fontSize: 12, fontWeight: active ? 700 : 500,
       background: active ? '#2563eb' : '#fff',
       color: active ? '#fff' : '#374151',
       border: '1px solid ' + (active ? '#2563eb' : '#d1d5db'),
-      borderRadius: 5, cursor: 'pointer',
+      borderRadius: 6, cursor: 'pointer',
     }}>{children}</button>
-  );
-}
-
-function FilterChip({ active, onClick, children, color = '#2563eb' }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: '6px 12px', fontSize: 12, fontWeight: active ? 700 : 500,
-      background: active ? color : '#fff',
-      color: active ? '#fff' : '#374151',
-      border: '1px solid ' + (active ? color : '#d1d5db'),
-      borderRadius: 16, cursor: 'pointer',
-    }}>{children}</button>
-  );
-}
-
-export default function BrandsPage() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-
-  // 필터/검색 상태
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('sales');
-  const [managerFilter, setManagerFilter] = useState('all');
-  const [hotOnly, setHotOnly] = useState(false);
-  const [expanded, setExpanded] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/preview-data')
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) setError(d.message || d.error);
-        else setData(d);
-      })
-      .catch(e => setError(e.message));
-  }, []);
-
-  // 브랜드 → 마켓 매칭
-  const aggregated = useMemo(() => {
-    if (!data?.brands) return [];
-    return data.brands.map(b => {
-      const myMarkets = (data.marketsList || []).filter(m => m.brandName === b.name);
-      return {
-        ...b,
-        markets: myMarkets,
-      };
-    });
-  }, [data]);
-
-  // 담당자 목록 (브랜드 데이터에서 추출)
-  const managerList = useMemo(() => {
-    const set = new Set();
-    aggregated.forEach(b => { if (b.manager) set.add(b.manager); });
-    return [...set].sort();
-  }, [aggregated]);
-
-  // HOT 임계: 주문건수 상위 25%
-  const hotThreshold = useMemo(() => {
-    const sorted = aggregated.map(b => b.orderCount || 0).sort((a, b) => b - a);
-    const cutoff = Math.max(1, Math.floor(sorted.length * 0.25));
-    return sorted[cutoff - 1] || 0;
-  }, [aggregated]);
-
-  // 필터링
-  const filtered = useMemo(() => {
-    let arr = aggregated;
-    if (managerFilter !== 'all') arr = arr.filter(b => b.manager === managerFilter);
-    if (hotOnly) arr = arr.filter(b => (b.orderCount || 0) >= hotThreshold && hotThreshold > 0);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      arr = arr.filter(b =>
-        b.name.toLowerCase().includes(q) ||
-        (b.manager || '').toLowerCase().includes(q) ||
-        (b.sellers || []).some(s => s.toLowerCase().includes(q))
-      );
-    }
-    return [...arr].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
-  }, [aggregated, search, sortBy, managerFilter, hotOnly, hotThreshold]);
-
-  // 통계
-  const totalSales = aggregated.reduce((s, b) => s + (b.sales || 0), 0);
-  const totalOrders = aggregated.reduce((s, b) => s + (b.orderCount || 0), 0);
-  const totalMarkets = aggregated.reduce((s, b) => s + (b.marketCount || 0), 0);
-  const hotCount = aggregated.filter(b => (b.orderCount || 0) >= hotThreshold && hotThreshold > 0).length;
-
-  return (
-    <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, margin: 0 }}>🏷️ 브랜드 관리</h1>
-        <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
-          이번달 진행 브랜드 · 담당자 / 거래형태 / HOT 필터 · 브랜드 클릭 → 마켓 리스트 펼침
-        </p>
-      </header>
-
-      {error && (
-        <div style={{ ...card, background: '#fef2f2', border: '1px solid #fca5a5', marginBottom: 16 }}>
-          <strong style={{ color: '#991b1b' }}>⚠️ {error}</strong>
-        </div>
-      )}
-
-      {!data && !error && (
-        <div style={{ ...card, textAlign: 'center', padding: 60 }}>
-          <div style={{ fontSize: 24, marginBottom: 12 }}>⏳</div>
-          <div style={{ fontSize: 14, color: '#6b7280' }}>브랜드 데이터 불러오는 중...</div>
-        </div>
-      )}
-
-      {data && (
-        <>
-          {/* 요약 카드 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-            <SummaryCard label="총 브랜드" value={`${aggregated.length}개`} accent="#2563eb" />
-            <SummaryCard label="누적 매출" value={fmt(totalSales)} accent="#10b981" />
-            <SummaryCard label="총 주문" value={`${totalOrders.toLocaleString('ko-KR')}건`} accent="#7c3aed" />
-            <SummaryCard label="🔥 HOT 브랜드" value={`${hotCount}개`} accent="#f59e0b" />
-          </div>
-
-          {/* 필터 영역 */}
-          <div style={{ ...card, marginBottom: 16 }}>
-            <SectionTitle emoji="🔍" title="필터 / 검색" />
-
-            {/* 검색 */}
-            <input
-              type="text"
-              placeholder="브랜드명 / 담당자명 / 셀러명 검색..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                width: '100%', padding: '10px 14px', fontSize: 14,
-                border: '1px solid #d1d5db', borderRadius: 8, marginBottom: 12,
-                boxSizing: 'border-box',
-              }}
-            />
-
-            {/* 담당자 필터 */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 6 }}>상품 담당자</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <FilterChip active={managerFilter === 'all'} onClick={() => setManagerFilter('all')}>
-                  전체 ({aggregated.length})
-                </FilterChip>
-                {managerList.map(m => {
-                  const c = aggregated.filter(b => b.manager === m).length;
-                  return (
-                    <FilterChip key={m} active={managerFilter === m} onClick={() => setManagerFilter(m)}>
-                      {m} ({c})
-                    </FilterChip>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* HOT 필터 + 정렬 */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <FilterChip active={hotOnly} onClick={() => setHotOnly(!hotOnly)} color="#f59e0b">
-                🔥 HOT만 보기 (주문 상위 25%)
-              </FilterChip>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>정렬:</span>
-                <SortBtn active={sortBy === 'sales'} onClick={() => setSortBy('sales')}>매출 ↓</SortBtn>
-                <SortBtn active={sortBy === 'orderCount'} onClick={() => setSortBy('orderCount')}>주문 ↓</SortBtn>
-                <SortBtn active={sortBy === 'marketCount'} onClick={() => setSortBy('marketCount')}>공구 ↓</SortBtn>
-                <SortBtn active={sortBy === 'achievementRate'} onClick={() => setSortBy('achievementRate')}>달성률 ↓</SortBtn>
-              </div>
-            </div>
-
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 10 }}>
-              <strong style={{ color: '#374151' }}>{filtered.length}개</strong> 브랜드 표시
-              {search && <> · 검색 "<strong>{search}</strong>"</>}
-              {managerFilter !== 'all' && <> · 담당자 <strong style={{ color: '#2563eb' }}>{managerFilter}</strong></>}
-              {hotOnly && <> · <strong style={{ color: '#f59e0b' }}>🔥 HOT</strong></>}
-            </div>
-          </div>
-
-          {/* 브랜드 리스트 */}
-          <div style={card}>
-            <SectionTitle
-              emoji="📋"
-              title="브랜드 리스트"
-              hint="행 클릭 → 해당 브랜드의 마켓 상세"
-            />
-
-            {/* 헤더 */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '34px minmax(180px,1.6fr) 90px 80px 100px 80px 70px 100px 60px 28px',
-              gap: 8, padding: '10px 12px',
-              background: '#f9fafb', borderRadius: 6,
-              fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 6,
-            }}>
-              <div>#</div>
-              <div>브랜드 / 셀러</div>
-              <div>담당자</div>
-              <div style={{ textAlign: 'center' }}>HOT</div>
-              <div style={{ textAlign: 'right' }}>매출</div>
-              <div style={{ textAlign: 'right' }}>주문건수</div>
-              <div style={{ textAlign: 'right' }}>공구건수</div>
-              <div style={{ textAlign: 'right' }}>예상매출</div>
-              <div style={{ textAlign: 'right' }}>달성률</div>
-              <div></div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {filtered.map((b, i) => {
-                const isHot = (b.orderCount || 0) >= hotThreshold && hotThreshold > 0;
-                const isOpen = expanded === b.name;
-                return (
-                  <div key={b.name} style={{
-                    border: '1px solid ' + (isOpen ? '#2563eb' : '#e5e7eb'),
-                    borderRadius: 8, overflow: 'hidden',
-                  }}>
-                    <div
-                      onClick={() => setExpanded(isOpen ? null : b.name)}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '34px minmax(180px,1.6fr) 90px 80px 100px 80px 70px 100px 60px 28px',
-                        gap: 8, padding: '12px', cursor: 'pointer',
-                        background: isOpen ? '#eff6ff' : '#fff',
-                        alignItems: 'center', fontSize: 13,
-                      }}
-                    >
-                      <div style={{ color: '#9ca3af' }}>#{i + 1}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{b.name}</div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {(b.sellers || []).slice(0, 3).join(', ')}
-                          {(b.sellers || []).length > 3 && ` +${b.sellers.length - 3}`}
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{b.manager || '-'}</div>
-                      <div style={{ textAlign: 'center' }}>
-                        {isHot && (
-                          <span style={{
-                            fontSize: 10, padding: '2px 7px', borderRadius: 10,
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-                            color: '#fff', fontWeight: 700,
-                          }}>🔥 HOT</span>
-                        )}
-                      </div>
-                      <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13 }}>{fmt(b.sales)}</div>
-                      <div style={{ textAlign: 'right', fontSize: 12 }}>{(b.orderCount || 0).toLocaleString('ko-KR')}건</div>
-                      <div style={{ textAlign: 'right', color: '#6b7280', fontSize: 12 }}>{b.marketCount}개</div>
-                      <div style={{ textAlign: 'right', color: '#6b7280', fontSize: 12 }}>{fmt(b.estimatedSales)}</div>
-                      <div style={{
-                        textAlign: 'right', fontWeight: 600, fontSize: 12,
-                        color: b.achievementRate >= 100 ? '#10b981' : b.achievementRate >= 80 ? '#f59e0b' : '#ef4444',
-                      }}>{b.achievementRate != null ? `${b.achievementRate.toFixed(0)}%` : '-'}</div>
-                      <div style={{ textAlign: 'right', color: '#9ca3af' }}>{isOpen ? '▲' : '▼'}</div>
-                    </div>
-
-                    {isOpen && (
-                      <div style={{ padding: 16, background: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
-                        <div style={{ display: 'flex', gap: 24, marginBottom: 14, flexWrap: 'wrap' }}>
-                          <div>
-                            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>함께 일한 셀러 ({(b.sellers || []).length}곳)</div>
-                            <div style={{ fontSize: 13, marginTop: 4 }}>{(b.sellers || []).join(' · ')}</div>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>상품 담당자</div>
-                            <div style={{ fontSize: 13, marginTop: 4, fontWeight: 600 }}>{b.manager || '-'}</div>
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                          진행 마켓 <strong>{b.markets.length}개</strong>
-                        </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 6, overflow: 'hidden' }}>
-                          <thead>
-                            <tr style={{ background: '#f3f4f6' }}>
-                              <th style={th}>셀러</th>
-                              <th style={th}>담당자</th>
-                              <th style={{ ...th, textAlign: 'center' }}>상태</th>
-                              <th style={{ ...th, textAlign: 'right' }}>매출</th>
-                              <th style={{ ...th, textAlign: 'right' }}>주문</th>
-                              <th style={{ ...th, textAlign: 'right' }}>달성률</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {b.markets.sort((a, c) => (c.sales || 0) - (a.sales || 0)).map(m => {
-                              const stColor = { ENDED: '#6b7280', ACTIVE: '#10b981', READY: '#3b82f6' }[m.status] || '#6b7280';
-                              const stLabel = { ENDED: '종료', ACTIVE: '진행중', READY: '예정' }[m.status] || m.status;
-                              const achColor = m.achievementRate >= 100 ? '#10b981' : m.achievementRate >= 80 ? '#f59e0b' : '#ef4444';
-                              return (
-                                <tr key={m.id}>
-                                  <td style={{ ...td, fontWeight: 500 }}>{m.sellerName}</td>
-                                  <td style={td}>{m.managerName}</td>
-                                  <td style={{ ...td, textAlign: 'center' }}>
-                                    <span style={{ color: stColor, fontWeight: 600, fontSize: 11 }}>{stLabel}</span>
-                                  </td>
-                                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{fmt(m.sales)}</td>
-                                  <td style={{ ...td, textAlign: 'right' }}>{(m.orderCount || 0).toLocaleString('ko-KR')}건</td>
-                                  <td style={{ ...td, textAlign: 'right', color: achColor, fontWeight: 600 }}>
-                                    {m.achievementRate != null ? `${m.achievementRate.toFixed(0)}%` : '-'}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {filtered.length === 0 && (
-              <div style={{ padding: 30, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-                조건에 맞는 브랜드 없음
-              </div>
-            )}
-          </div>
-
-          {/* 안내 */}
-          <div style={{
-            padding: 16, marginTop: 24, background: '#fffbeb', border: '1px solid #fde68a',
-            borderRadius: 12, fontSize: 13, color: '#78350f', lineHeight: 1.6,
-          }}>
-            💡 <strong>추후 추가 가능한 기능:</strong>
-            <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-              <li>거래형태 (밴더사/본사) 필터 — 와이어드민 vendor API 추가 연동 필요</li>
-              <li>브랜드별 카테고리 분포 / 단가대 분포</li>
-              <li>전월/전년 동월 비교</li>
-              <li>브랜드별 CS율, 배송완료율 (와이어드민 추가 데이터 필요)</li>
-            </ul>
-          </div>
-        </>
-      )}
-    </main>
   );
 }
 
@@ -369,7 +120,220 @@ function SummaryCard({ label, value, accent }) {
       borderLeft: `4px solid ${accent}`,
     }}>
       <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#111' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: '#111' }}>{value}</div>
     </div>
+  );
+}
+
+// 한 행 = 목표 또는 실적
+function MonthRow({ values, isActual, targets, totalBg = '#eff6ff' }) {
+  const total = sum(values);
+  return (
+    <>
+      {values.map((v, j) => {
+        if (isActual) {
+          const { color, bg } = rateColor(v, targets[j]);
+          return (
+            <td key={j} style={{ ...cellBase, color, background: bg, fontWeight: 700 }}>{v}</td>
+          );
+        }
+        return (
+          <td key={j} style={{ ...cellBase, color: '#6b7280' }}>{v}</td>
+        );
+      })}
+      <td style={{ ...cellBase, fontWeight: 700, background: isActual ? '#dbeafe' : totalBg, color: isActual ? '#37352f' : '#374151' }}>
+        {total}
+      </td>
+    </>
+  );
+}
+
+// ─────────────── 메인 ───────────────
+export default function BrandsPage() {
+  const [managerMode, setManagerMode] = useState('discoverer'); // 'discoverer' | 'manager'
+
+  // 담당자별 집계
+  const byManager = useMemo(() => {
+    const map = new Map();
+    for (const b of BRANDS_MOCK) {
+      const key = b[managerMode];
+      if (!key) continue;
+      const cur = map.get(key) || {
+        name: key,
+        targets: new Array(MONTHS.length).fill(0),
+        actuals: new Array(MONTHS.length).fill(0),
+        brands: [],
+      };
+      for (let i = 0; i < MONTHS.length; i++) {
+        cur.targets[i] += b.targets[i];
+        cur.actuals[i] += b.actuals[i];
+      }
+      cur.brands.push(b.name);
+      map.set(key, cur);
+    }
+    return [...map.values()].sort((a, b) => sum(b.actuals) - sum(a.actuals));
+  }, [managerMode]);
+
+  // Total 행 (브랜드별 테이블)
+  const grandTargets = new Array(MONTHS.length).fill(0);
+  const grandActuals = new Array(MONTHS.length).fill(0);
+  for (const b of BRANDS_MOCK) {
+    for (let i = 0; i < MONTHS.length; i++) {
+      grandTargets[i] += b.targets[i];
+      grandActuals[i] += b.actuals[i];
+    }
+  }
+
+  // 요약
+  const totalTargetAll = sum(grandTargets);
+  const totalActualAll = sum(grandActuals);
+  const overallRate = totalTargetAll > 0 ? (totalActualAll / totalTargetAll) * 100 : 0;
+
+  return (
+    <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
+      <header style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, margin: 0 }}>🏷️ 브랜드 관리</h1>
+        <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
+          브랜드별 월별 <strong>목표</strong> vs <strong>실적</strong> · 발굴/관리 담당자별 집계 ·
+          <span style={{ marginLeft: 6, padding: '2px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontWeight: 600, fontSize: 11 }}>현재 mock 데이터</span>
+        </p>
+      </header>
+
+      {/* 요약 카드 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        <SummaryCard label="관리 브랜드" value={`${BRANDS_MOCK.length}개`} accent="#2563eb" />
+        <SummaryCard label="누적 목표 (6개월)" value={`${totalTargetAll}백만원`} accent="#6b7280" />
+        <SummaryCard label="누적 실적 (6개월)" value={`${totalActualAll}백만원`} accent="#10b981" />
+        <SummaryCard
+          label="전체 달성률"
+          value={`${overallRate.toFixed(1)}%`}
+          accent={overallRate >= 100 ? '#10b981' : overallRate >= 70 ? '#f59e0b' : '#ef4444'}
+        />
+      </div>
+
+      {/* 테이블 1: 브랜드별 */}
+      <div style={{ ...card, marginBottom: 20 }}>
+        <SectionTitle
+          emoji="📊"
+          title="브랜드별 월별 목표 vs 실적"
+          hint="실적 셀 색상: 🟢 100%+ 달성 · 🟡 70%~ · 🟠 30%~ · 🔴 30% 미만"
+        />
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={th}>브랜드</th>
+                <th style={th}>발굴 담당자</th>
+                <th style={th}>관리 담당자</th>
+                <th style={{ ...th, textAlign: 'center' }}>구분</th>
+                {MONTHS.map(m => (
+                  <th key={m} style={{ ...th, textAlign: 'center', minWidth: 56 }}>{m}</th>
+                ))}
+                <th style={{ ...th, textAlign: 'center', background: '#eff6ff' }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {BRANDS_MOCK.map((b, i) => (
+                <Fragment key={b.name}>
+                  <tr style={{ borderTop: i > 0 ? '2px solid #e5e7eb' : 'none' }}>
+                    <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{b.name}</td>
+                    <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.discoverer}</td>
+                    <td rowSpan={2} style={{ ...td, fontSize: 12, color: '#6b7280', verticalAlign: 'middle' }}>{b.manager}</td>
+                    <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>목표</td>
+                    <MonthRow values={b.targets} isActual={false} targets={b.targets} />
+                  </tr>
+                  <tr>
+                    <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
+                    <MonthRow values={b.actuals} isActual={true} targets={b.targets} />
+                  </tr>
+                </Fragment>
+              ))}
+
+              {/* Total 행 */}
+              <tr style={{ borderTop: '3px solid #2563eb', background: '#f9fafb' }}>
+                <td colSpan={3} rowSpan={2} style={{ ...td, fontWeight: 700, fontSize: 14, color: '#2563eb', textAlign: 'center', verticalAlign: 'middle' }}>
+                  Total
+                </td>
+                <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 700 }}>목표</td>
+                <MonthRow values={grandTargets} isActual={false} targets={grandTargets} totalBg="#bfdbfe" />
+              </tr>
+              <tr style={{ background: '#f9fafb' }}>
+                <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
+                <MonthRow values={grandActuals} isActual={true} targets={grandTargets} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 테이블 2: 담당자별 */}
+      <div style={{ ...card, marginBottom: 20 }}>
+        <SectionTitle
+          emoji="👤"
+          title="담당자별 월별 합계"
+          hint="각 담당자가 맡은 브랜드들의 목표 / 실적 합산"
+          action={
+            <div style={{ display: 'flex', gap: 6 }}>
+              <ToggleBtn active={managerMode === 'discoverer'} onClick={() => setManagerMode('discoverer')}>
+                🔍 발굴 담당자
+              </ToggleBtn>
+              <ToggleBtn active={managerMode === 'manager'} onClick={() => setManagerMode('manager')}>
+                📋 관리 담당자
+              </ToggleBtn>
+            </div>
+          }
+        />
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={th}>{managerMode === 'discoverer' ? '발굴' : '관리'} 담당자</th>
+                <th style={th}>담당 브랜드</th>
+                <th style={{ ...th, textAlign: 'center' }}>구분</th>
+                {MONTHS.map(m => (
+                  <th key={m} style={{ ...th, textAlign: 'center', minWidth: 56 }}>{m}</th>
+                ))}
+                <th style={{ ...th, textAlign: 'center', background: '#eff6ff' }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byManager.map((mgr, i) => (
+                <Fragment key={mgr.name}>
+                  <tr style={{ borderTop: i > 0 ? '2px solid #e5e7eb' : 'none' }}>
+                    <td rowSpan={2} style={{ ...td, fontWeight: 600, verticalAlign: 'middle' }}>{mgr.name}</td>
+                    <td rowSpan={2} style={{ ...td, fontSize: 11, color: '#6b7280', verticalAlign: 'middle' }}>
+                      <div>{mgr.brands.join(', ')}</div>
+                      <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{mgr.brands.length}개 브랜드</div>
+                    </td>
+                    <td style={{ ...cellBase, fontSize: 11, color: '#6b7280', fontWeight: 600 }}>목표</td>
+                    <MonthRow values={mgr.targets} isActual={false} targets={mgr.targets} />
+                  </tr>
+                  <tr>
+                    <td style={{ ...cellBase, fontSize: 11, color: '#374151', fontWeight: 700 }}>실적</td>
+                    <MonthRow values={mgr.actuals} isActual={true} targets={mgr.targets} />
+                  </tr>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 안내문 */}
+      <div style={{
+        padding: 16, background: '#fffbeb', border: '1px solid #fde68a',
+        borderRadius: 12, fontSize: 13, color: '#78350f', lineHeight: 1.6,
+      }}>
+        ℹ️ <strong>현재 mock 데이터 — 향후 실데이터 연동 계획:</strong>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+          <li>🏷️ <strong>브랜드 목록 + 발굴/관리 담당자</strong> → 와이어드민 + 준비 중인 별도 사이트에서 자동 동기화</li>
+          <li>🎯 <strong>월별 목표</strong> → 사업개발팀 <strong>분기별</strong> 설정 (입력 UI 추후 추가)</li>
+          <li>💰 <strong>월별 실적</strong> → 와이어드민 API (totalWiredSalesAmount, 백만원 단위)</li>
+          <li>📅 <strong>분기 단위 보기</strong> → 분기로 진행될 가능성이 높아 분기 토글 추후 추가 예정</li>
+        </ul>
+      </div>
+    </main>
   );
 }
