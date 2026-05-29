@@ -1,6 +1,8 @@
 'use client';
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { MOCK_SELLER_MGMT, MOCK_PARTNER_NOTION } from '../mock-data';
+
+const TARGET_STORAGE_KEY = 'seller-targets-v1';
 
 const MONTHS = MOCK_SELLER_MGMT.months;
 const ALL_SELLERS = MOCK_SELLER_MGMT.sellers;
@@ -176,11 +178,103 @@ function PartnerTag() {
   );
 }
 
+// ─── 매출 목표 인라인 편집 셀 ───
+function EditableTargetCell({ value, original, onChange, muted }) {
+  const isEdited = value !== original;
+  const [local, setLocal] = useState(String(value));
+
+  useEffect(() => { setLocal(String(value)); }, [value]);
+
+  const commit = () => {
+    const trimmed = local.trim();
+    if (trimmed === '') {
+      onChange(null); // 원래값으로 되돌리기
+      return;
+    }
+    const num = parseInt(trimmed, 10);
+    if (isNaN(num) || num < 0) {
+      setLocal(String(value));
+      return;
+    }
+    if (num !== value) onChange(num);
+  };
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { setLocal(String(value)); e.currentTarget.blur(); }
+      }}
+      onFocus={(e) => e.target.select()}
+      title="클릭해서 수정 (Enter 저장, Esc 취소, 빈칸 입력 시 원래값으로)"
+      style={{
+        width: '100%',
+        background: isEdited ? '#fef3c7' : 'transparent',
+        border: isEdited ? `1px solid ${C.amber}` : '1px solid transparent',
+        borderRadius: 4,
+        textAlign: 'center',
+        fontSize: 13,
+        padding: '4px 0',
+        color: isEdited ? '#92400e' : (muted ? C.faint : C.ink),
+        fontWeight: isEdited ? 700 : (muted ? 400 : 600),
+        cursor: 'text',
+        outline: 'none',
+        fontFamily: 'inherit',
+      }}
+      onMouseEnter={(e) => { if (!isEdited) e.currentTarget.style.background = '#fffbeb'; }}
+      onMouseLeave={(e) => { if (!isEdited) e.currentTarget.style.background = 'transparent'; }}
+    />
+  );
+}
+
 // ============================================================
 //  디자인 A: 테이블 + 달성률 + 셀러 클릭 → 월별 마켓 펼침
 // ============================================================
 function DesignA({ sellers }) {
   const [expanded, setExpanded] = useState(null);
+  const [overrides, setOverrides] = useState({});
+
+  // localStorage에서 사용자 수정값 불러오기
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(TARGET_STORAGE_KEY);
+      if (stored) setOverrides(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  function saveOverrides(next) {
+    setOverrides(next);
+    try { localStorage.setItem(TARGET_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  function updateTarget(sellerName, monthIdx, value) {
+    const key = `${sellerName}::${monthIdx}`;
+    const next = { ...overrides };
+    if (value == null) delete next[key];
+    else next[key] = value;
+    saveOverrides(next);
+  }
+
+  function resetAll() {
+    if (window.confirm('수정한 매출 목표를 모두 초기 mock 데이터로 되돌릴까요?')) {
+      saveOverrides({});
+    }
+  }
+
+  // 효과적 목표값 (override 있으면 override, 없으면 원본)
+  function effectiveTargets(s) {
+    return s.targets.map((v, i) => {
+      const k = `${s.name}::${i}`;
+      return overrides[k] != null ? overrides[k] : v;
+    });
+  }
+
+  const overrideCount = Object.keys(overrides).length;
 
   const th = {
     padding: '14px 8px',
@@ -197,11 +291,13 @@ function DesignA({ sellers }) {
     fontSize: 13, borderBottom: `1px solid ${C.dividerSoft}`,
   };
 
+  // override 적용된 grand totals
   const grandT = new Array(MONTHS.length).fill(0);
   const grandA = new Array(MONTHS.length).fill(0);
   for (const s of sellers) {
+    const effT = effectiveTargets(s);
     for (let i = 0; i < MONTHS.length; i++) {
-      grandT[i] += s.targets[i];
+      grandT[i] += effT[i];
       grandA[i] += s.actuals[i];
     }
   }
@@ -232,8 +328,29 @@ function DesignA({ sellers }) {
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 6, height: 6, background: C.muted, borderRadius: 1 }} />공구건수
           </span>
-          <span style={{ marginLeft: 8, color: C.faint }}>· 행 클릭 → 마켓 상세</span>
         </div>
+      </div>
+
+      {/* 편집 안내 + 초기화 버튼 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 20px', background: '#fffbeb',
+        borderBottom: `1px solid ${C.dividerSoft}`,
+        fontSize: 12, color: '#78350f',
+      }}>
+        <span>✏️ <strong>매출 목표 셀을 클릭</strong>해서 수기로 수정 가능 (Enter 저장 · Esc 취소 · 빈칸 입력 시 원래값)</span>
+        <span style={{ color: '#92400e' }}>· 행 클릭 → 마켓 상세 펼침</span>
+        <div style={{ flex: 1 }} />
+        {overrideCount > 0 && (
+          <button
+            onClick={resetAll}
+            style={{
+              padding: '5px 12px', fontSize: 11, fontWeight: 700,
+              background: '#fff', color: C.amber,
+              border: `1px solid ${C.amber}`, borderRadius: 6, cursor: 'pointer',
+            }}
+          >✕ 수정 초기화 ({overrideCount}개)</button>
+        )}
       </div>
 
       <div style={{ overflowX: 'auto', padding: '0 4px' }}>
@@ -258,7 +375,8 @@ function DesignA({ sellers }) {
           </thead>
           <tbody>
             {sellers.map((s, i) => {
-              const tTotal = sum(s.targets);
+              const effT = effectiveTargets(s);
+              const tTotal = sum(effT);
               const aTotal = sum(s.actuals);
               const rate = tTotal > 0 ? (aTotal / tTotal) * 100 : 0;
               const acc = rateAccent(rate);
@@ -299,11 +417,28 @@ function DesignA({ sellers }) {
                       {PARTNERS.has(s.name) && <PartnerTag />}
                     </td>
                     <td rowSpan={4} style={{ ...td, fontSize: 12, color: C.muted, verticalAlign: 'middle' }}>{s.manager}</td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.faint, fontWeight: 500, textAlign: 'left', paddingLeft: 8 }}>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ ...cellNum, fontSize: 11, color: C.faint, fontWeight: 500, textAlign: 'left', paddingLeft: 8 }}
+                    >
                       <span style={{ display: 'inline-block', width: 6, height: 6, background: C.faint, borderRadius: 1, marginRight: 6, verticalAlign: 'middle', opacity: 0.5 }} />
                       매출 목표
+                      <span style={{ marginLeft: 4, fontSize: 9, color: C.amber, fontWeight: 600 }}>✏️</span>
                     </td>
-                    {s.targets.map((v, j) => <td key={j} style={{ ...cellNum, color: C.faint }}>{v}</td>)}
+                    {effT.map((v, j) => (
+                      <td
+                        key={j}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ ...cellNum, color: C.faint, padding: 4 }}
+                      >
+                        <EditableTargetCell
+                          value={v}
+                          original={s.targets[j]}
+                          onChange={(newVal) => updateTarget(s.name, j, newVal)}
+                          muted
+                        />
+                      </td>
+                    ))}
                     <td style={{ ...cellNum, fontWeight: 600, color: C.faint, background: C.surfaceMuted }}>{tTotal}</td>
                     <td rowSpan={4} style={{ ...cellNum, verticalAlign: 'middle', background: C.surfaceMuted }}>
                       <div style={{
