@@ -64,10 +64,22 @@ function rateAccent(rate) {
 }
 
 // ─────────────── 페이지 헤더 + 통계 ───────────────
-function PageHeader({ sellers }) {
-  const totalT = sellers.reduce((s, x) => s + sum(x.targets), 0);
+function PageHeader({ sellers, overrides = {} }) {
+  // override 적용된 목표 합산
+  const totalT = sellers.reduce((s, x) => {
+    return s + x.targets.reduce((a, v, i) => {
+      const k = `${x.name}::${i}`;
+      return a + (overrides[k] != null ? overrides[k] : v);
+    }, 0);
+  }, 0);
   const totalA = sellers.reduce((s, x) => s + sum(x.actuals), 0);
+  // 영업이익 = 모든 셀러의 모든 월별 마켓 profit 합
+  const totalProfit = sellers.reduce((s, x) => {
+    return s + x.marketsByMonth.reduce((mp, ms) =>
+      mp + ms.reduce((p, m) => p + (m.profit || 0), 0), 0);
+  }, 0);
   const rate = totalT > 0 ? (totalA / totalT) * 100 : 0;
+  const profitRate = totalA > 0 ? (totalProfit / totalA) * 100 : 0;
   const partnerCount = sellers.filter(s => PARTNERS.has(s.name)).length;
   const acc = rateAccent(rate);
 
@@ -85,15 +97,17 @@ function PageHeader({ sellers }) {
 
       {/* 통계 스트립 — 인디고 강조 */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
+        display: 'grid', gridTemplateColumns: '0.8fr 0.8fr 1fr 1fr 1fr 1fr 1fr', gap: 0,
         marginBottom: 16, overflow: 'hidden',
         ...cardStyle,
       }}>
         <Stat label="관리 셀러" value={`${sellers.length}`} unit="곳" />
+        <Stat label="🤝 파트너" value={`${partnerCount}`} unit="곳" />
         <Stat label="누적 목표" value={`${totalT.toLocaleString()}`} unit="백만원" />
-        <Stat label="누적 실적" value={`${totalA.toLocaleString()}`} unit="백만원" accent />
-        <Stat label="전체 달성률" value={`${rate.toFixed(1)}%`} accentColor={acc.color} bg={acc.bg} />
-        <Stat label="🤝 파트너 셀러" value={`${partnerCount}`} unit="곳" />
+        <Stat label="누적 매출" value={`${totalA.toLocaleString()}`} unit="백만원" accent />
+        <Stat label="매출 달성률" value={`${rate.toFixed(1)}%`} accentColor={acc.color} bg={acc.bg} />
+        <Stat label="누적 영업이익" value={`${totalProfit.toLocaleString()}`} unit="백만원" accentColor={C.emerald} />
+        <Stat label="영업이익률" value={`${profitRate.toFixed(1)}%`} accentColor={C.emerald} bg={C.emeraldSoft} />
       </div>
     </>
   );
@@ -259,36 +273,8 @@ function EditableTargetCell({ value, original, onChange, muted }) {
 // ============================================================
 //  디자인 A: 테이블 + 달성률 + 셀러 클릭 → 월별 마켓 펼침
 // ============================================================
-function DesignA({ sellers }) {
+function DesignA({ sellers, overrides, updateTarget, resetAll }) {
   const [expanded, setExpanded] = useState(null);
-  const [overrides, setOverrides] = useState({});
-
-  // localStorage에서 사용자 수정값 불러오기
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(TARGET_STORAGE_KEY);
-      if (stored) setOverrides(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  function saveOverrides(next) {
-    setOverrides(next);
-    try { localStorage.setItem(TARGET_STORAGE_KEY, JSON.stringify(next)); } catch {}
-  }
-
-  function updateTarget(sellerName, monthIdx, value) {
-    const key = `${sellerName}::${monthIdx}`;
-    const next = { ...overrides };
-    if (value == null) delete next[key];
-    else next[key] = value;
-    saveOverrides(next);
-  }
-
-  function resetAll() {
-    if (window.confirm('수정한 매출 목표를 모두 초기 mock 데이터로 되돌릴까요?')) {
-      saveOverrides({});
-    }
-  }
 
   // 효과적 목표값 (override 있으면 override, 없으면 원본)
   function effectiveTargets(s) {
@@ -407,6 +393,69 @@ function DesignA({ sellers }) {
             </tr>
           </thead>
           <tbody>
+            {/* Total — 표 맨 위로 이동 */}
+            {(() => {
+              const grandProfits = MONTHS.map((_, j) =>
+                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.reduce((p, m) => p + (m.profit || 0), 0) || 0), 0)
+              );
+              const grandMarkets = MONTHS.map((_, j) =>
+                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.length || 0), 0)
+              );
+              return (
+                <>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td colSpan={2} rowSpan={4} style={{
+                      ...td, fontWeight: 700, fontSize: 14,
+                      textAlign: 'center', verticalAlign: 'middle', color: C.indigo,
+                      background: C.indigoSoft,
+                    }}>Total<div style={{ fontSize: 10, fontWeight: 500, color: C.muted, marginTop: 2 }}>전체 합계</div></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 목표</td>
+                    {grandT.map((v, j) => <td key={j} style={{ ...cellNum, color: C.muted, background: C.indigoSoft }}>{v}</td>)}
+                    <td style={{ ...cellNum, fontWeight: 700, color: C.muted, background: C.indigoMid }}>{sum(grandT)}</td>
+                    <td rowSpan={4} style={{ ...cellNum, verticalAlign: 'middle', background: C.indigoMid, fontWeight: 800, fontSize: 18, color: C.indigo }}>
+                      {grandRate.toFixed(0)}%
+                    </td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 실적</td>
+                    {grandA.map((v, j) => (
+                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint, background: C.indigoSoft }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
+                    ))}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.indigo, background: C.indigoMid, fontSize: 14 }}>{sum(grandA)}</td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft }}>
+                    <td></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.emerald, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>영업이익</td>
+                    {grandProfits.map((v, j) => (
+                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.emerald : C.faint, background: C.indigoSoft }}>
+                        {COMPLETED_MONTHS.has(j) ? v : '-'}
+                      </td>
+                    ))}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.emerald, background: C.indigoMid, fontSize: 14 }}>{sum(grandProfits)}</td>
+                  </tr>
+                  <tr style={{ background: C.indigoSoft, borderBottom: `3px solid ${C.indigo}` }}>
+                    <td style={{ borderBottom: `3px solid ${C.indigo}` }}></td>
+                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8, borderBottom: `3px solid ${C.indigo}` }}>공구건수</td>
+                    {grandMarkets.map((v, j) => {
+                      const planned = !COMPLETED_MONTHS.has(j);
+                      return (
+                        <td key={j} style={{ ...cellNum, fontWeight: 700, color: planned ? C.amber : C.muted, background: C.indigoSoft, fontSize: 12, borderBottom: `3px solid ${C.indigo}` }}>
+                          {v}<span style={{ fontSize: 9, marginLeft: 1 }}>건{planned ? '예' : ''}</span>
+                        </td>
+                      );
+                    })}
+                    <td style={{ ...cellNum, fontWeight: 800, color: C.muted, background: C.indigoMid, fontSize: 13, borderBottom: `3px solid ${C.indigo}` }}>
+                      {sum(grandMarkets)}<span style={{ fontSize: 10 }}>건</span>
+                    </td>
+                  </tr>
+                </>
+              );
+            })()}
+
             {sellers.map((s, i) => {
               const effT = effectiveTargets(s);
               const tTotal = sum(effT);
@@ -551,70 +600,6 @@ function DesignA({ sellers }) {
                 </Fragment>
               );
             })}
-
-            {/* Total */}
-            {(() => {
-              // Total 영업이익 + 공구건수 집계
-              const grandProfits = MONTHS.map((_, j) =>
-                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.reduce((p, m) => p + (m.profit || 0), 0) || 0), 0)
-              );
-              const grandMarkets = MONTHS.map((_, j) =>
-                sellers.reduce((acc, s) => acc + (s.marketsByMonth[j]?.length || 0), 0)
-              );
-              return (
-                <>
-                  <tr style={{ borderTop: `3px solid ${C.indigo}`, background: C.indigoSoft }}>
-                    <td></td>
-                    <td colSpan={2} rowSpan={4} style={{
-                      ...td, fontWeight: 700, fontSize: 14,
-                      textAlign: 'center', verticalAlign: 'middle', color: C.indigo,
-                      background: C.indigoSoft,
-                    }}>Total</td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 목표</td>
-                    {grandT.map((v, j) => <td key={j} style={{ ...cellNum, color: C.muted, background: C.indigoSoft }}>{v}</td>)}
-                    <td style={{ ...cellNum, fontWeight: 700, color: C.muted, background: C.indigoMid }}>{sum(grandT)}</td>
-                    <td rowSpan={4} style={{ ...cellNum, verticalAlign: 'middle', background: C.indigoMid, fontWeight: 800, fontSize: 18, color: C.indigo }}>
-                      {grandRate.toFixed(0)}%
-                    </td>
-                  </tr>
-                  <tr style={{ background: C.indigoSoft }}>
-                    <td></td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.indigo, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>매출 실적</td>
-                    {grandA.map((v, j) => (
-                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.ink : C.faint, background: C.indigoSoft }}>
-                        {COMPLETED_MONTHS.has(j) ? v : '-'}
-                      </td>
-                    ))}
-                    <td style={{ ...cellNum, fontWeight: 800, color: C.indigo, background: C.indigoMid, fontSize: 14 }}>{sum(grandA)}</td>
-                  </tr>
-                  <tr style={{ background: C.indigoSoft }}>
-                    <td></td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.emerald, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>영업이익</td>
-                    {grandProfits.map((v, j) => (
-                      <td key={j} style={{ ...cellNum, fontWeight: 700, color: COMPLETED_MONTHS.has(j) ? C.emerald : C.faint, background: C.indigoSoft }}>
-                        {COMPLETED_MONTHS.has(j) ? v : '-'}
-                      </td>
-                    ))}
-                    <td style={{ ...cellNum, fontWeight: 800, color: C.emerald, background: C.indigoMid, fontSize: 14 }}>{sum(grandProfits)}</td>
-                  </tr>
-                  <tr style={{ background: C.indigoSoft }}>
-                    <td></td>
-                    <td style={{ ...cellNum, fontSize: 11, color: C.muted, fontWeight: 700, background: C.indigoSoft, textAlign: 'left', paddingLeft: 8 }}>공구건수</td>
-                    {grandMarkets.map((v, j) => {
-                      const planned = !COMPLETED_MONTHS.has(j);
-                      return (
-                        <td key={j} style={{ ...cellNum, fontWeight: 700, color: planned ? C.amber : C.muted, background: C.indigoSoft, fontSize: 12 }}>
-                          {v}<span style={{ fontSize: 9, marginLeft: 1 }}>건{planned ? '예' : ''}</span>
-                        </td>
-                      );
-                    })}
-                    <td style={{ ...cellNum, fontWeight: 800, color: C.muted, background: C.indigoMid, fontSize: 13 }}>
-                      {sum(grandMarkets)}<span style={{ fontSize: 10 }}>건</span>
-                    </td>
-                  </tr>
-                </>
-              );
-            })()}
           </tbody>
         </table>
       </div>
@@ -989,6 +974,34 @@ export default function SellersPage() {
   const [design, setDesign] = useState('A');
   const [managerFilter, setManagerFilter] = useState('all');
   const [partnerOnly, setPartnerOnly] = useState(false);
+  const [overrides, setOverrides] = useState({});
+
+  // localStorage 로드
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(TARGET_STORAGE_KEY);
+      if (stored) setOverrides(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  function saveOverrides(next) {
+    setOverrides(next);
+    try { localStorage.setItem(TARGET_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  function updateTarget(sellerName, monthIdx, value) {
+    const key = `${sellerName}::${monthIdx}`;
+    const next = { ...overrides };
+    if (value == null) delete next[key];
+    else next[key] = value;
+    saveOverrides(next);
+  }
+
+  function resetAll() {
+    if (window.confirm('수정한 매출 목표를 모두 초기 mock 데이터로 되돌릴까요?')) {
+      saveOverrides({});
+    }
+  }
 
   // 필터 적용된 셀러 리스트
   const filteredSellers = useMemo(() => {
@@ -1000,7 +1013,7 @@ export default function SellersPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
-      <PageHeader sellers={filteredSellers} />
+      <PageHeader sellers={filteredSellers} overrides={overrides} />
 
       {/* 담당자 필터 */}
       <ManagerFilter
@@ -1048,7 +1061,14 @@ export default function SellersPage() {
         </div>
       ) : (
         <>
-          {design === 'A' && <DesignA sellers={filteredSellers} />}
+          {design === 'A' && (
+            <DesignA
+              sellers={filteredSellers}
+              overrides={overrides}
+              updateTarget={updateTarget}
+              resetAll={resetAll}
+            />
+          )}
           {design === 'B' && <DesignB sellers={filteredSellers} />}
           {design === 'C' && <DesignC sellers={filteredSellers} />}
         </>
