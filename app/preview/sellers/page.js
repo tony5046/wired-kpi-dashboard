@@ -182,13 +182,14 @@ function PartnerTag() {
 function EditableTargetCell({ value, original, onChange, muted }) {
   const isEdited = value !== original;
   const [local, setLocal] = useState(String(value));
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => { setLocal(String(value)); }, [value]);
 
   const commit = () => {
     const trimmed = local.trim();
     if (trimmed === '') {
-      onChange(null); // 원래값으로 되돌리기
+      onChange(null);
       return;
     }
     const num = parseInt(trimmed, 10);
@@ -200,35 +201,58 @@ function EditableTargetCell({ value, original, onChange, muted }) {
   };
 
   return (
-    <input
-      type="number"
-      inputMode="numeric"
-      value={local}
-      onChange={(e) => setLocal(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        if (e.key === 'Escape') { setLocal(String(value)); e.currentTarget.blur(); }
-      }}
-      onFocus={(e) => e.target.select()}
-      title="클릭해서 수정 (Enter 저장, Esc 취소, 빈칸 입력 시 원래값으로)"
-      style={{
-        width: '100%',
-        background: isEdited ? '#fef3c7' : 'transparent',
-        border: isEdited ? `1px solid ${C.amber}` : '1px solid transparent',
-        borderRadius: 4,
-        textAlign: 'center',
-        fontSize: 13,
-        padding: '4px 0',
-        color: isEdited ? '#92400e' : (muted ? C.faint : C.ink),
-        fontWeight: isEdited ? 700 : (muted ? 400 : 600),
-        cursor: 'text',
-        outline: 'none',
-        fontFamily: 'inherit',
-      }}
-      onMouseEnter={(e) => { if (!isEdited) e.currentTarget.style.background = '#fffbeb'; }}
-      onMouseLeave={(e) => { if (!isEdited) e.currentTarget.style.background = 'transparent'; }}
-    />
+    <div style={{ position: 'relative', width: '100%' }}>
+      {/* 수정됨 표시 — 작은 인디고 점만 */}
+      {isEdited && !focused && (
+        <span style={{
+          position: 'absolute', top: 3, right: 4,
+          width: 5, height: 5,
+          background: C.indigo,
+          borderRadius: '50%',
+          pointerEvents: 'none',
+        }} title="수정됨" />
+      )}
+      <input
+        type="number"
+        inputMode="numeric"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => { setFocused(false); commit(); }}
+        onFocus={(e) => { setFocused(true); e.target.select(); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') { setLocal(String(value)); e.currentTarget.blur(); }
+        }}
+        title="클릭해서 수정 (Enter 저장 · Esc 취소 · 빈칸 = 원래값)"
+        style={{
+          width: '100%',
+          background: focused
+            ? '#fff'
+            : (isEdited ? '#eef2ff' : 'transparent'),  // 옅은 인디고 (강조 X)
+          border: focused
+            ? `1px solid ${C.indigo}`
+            : '1px solid transparent',
+          borderRadius: 4,
+          textAlign: 'center',
+          fontSize: 13,
+          padding: '4px 0',
+          // 색/굵기는 일반 목표 셀과 동일하게 — 튀지 않도록
+          color: muted ? C.faint : C.ink,
+          fontWeight: muted ? 400 : 600,
+          cursor: 'text',
+          outline: 'none',
+          fontFamily: 'inherit',
+          boxShadow: focused ? `0 0 0 3px ${C.indigoSoft}` : 'none',
+          transition: 'background 0.1s, box-shadow 0.1s',
+        }}
+        onMouseEnter={(e) => {
+          if (!focused && !isEdited) e.currentTarget.style.background = C.surfaceMuted;
+        }}
+        onMouseLeave={(e) => {
+          if (!focused && !isEdited) e.currentTarget.style.background = 'transparent';
+        }}
+      />
+    </div>
   );
 }
 
@@ -334,22 +358,31 @@ function DesignA({ sellers }) {
       {/* 편집 안내 + 초기화 버튼 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 20px', background: '#fffbeb',
+        padding: '10px 20px', background: C.surfaceMuted,
         borderBottom: `1px solid ${C.dividerSoft}`,
-        fontSize: 12, color: '#78350f',
+        fontSize: 12, color: C.muted,
       }}>
-        <span>✏️ <strong>매출 목표 셀을 클릭</strong>해서 수기로 수정 가능 (Enter 저장 · Esc 취소 · 빈칸 입력 시 원래값)</span>
-        <span style={{ color: '#92400e' }}>· 행 클릭 → 마켓 상세 펼침</span>
+        <span>
+          ✏️ <strong style={{ color: C.ink }}>매출 목표 셀 클릭</strong>해서 수기 수정 ·
+          <span style={{ color: C.faint, marginLeft: 4 }}>Enter 저장 · Esc 취소 · 빈칸 = 원래값</span>
+        </span>
+        <span style={{ color: C.faint }}>· 행 클릭 → 마켓 상세</span>
         <div style={{ flex: 1 }} />
         {overrideCount > 0 && (
-          <button
-            onClick={resetAll}
-            style={{
-              padding: '5px 12px', fontSize: 11, fontWeight: 700,
-              background: '#fff', color: C.amber,
-              border: `1px solid ${C.amber}`, borderRadius: 6, cursor: 'pointer',
-            }}
-          >✕ 수정 초기화 ({overrideCount}개)</button>
+          <>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.indigo, fontWeight: 600 }}>
+              <span style={{ width: 6, height: 6, background: C.indigo, borderRadius: '50%' }} />
+              {overrideCount}개 수정됨 (브라우저에 저장)
+            </span>
+            <button
+              onClick={resetAll}
+              style={{
+                padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                background: '#fff', color: C.muted,
+                border: `1px solid ${C.divider}`, borderRadius: 6, cursor: 'pointer',
+              }}
+            >초기화</button>
+          </>
         )}
       </div>
 
